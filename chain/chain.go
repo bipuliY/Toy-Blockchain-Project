@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"toy-blockchain/block"
-	"toy-blockchain/ledger"
 	"toy-blockchain/internal/transaction"
+	"toy-blockchain/ledger"
 )
 
 const (

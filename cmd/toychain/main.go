@@ -8,8 +8,8 @@ import (
 	"sort"
 
 	"toy-blockchain/chain"
-	"toy-blockchain/storage"
 	"toy-blockchain/internal/transaction"
+	"toy-blockchain/storage"
 )
 
 const defaultDataFile = "data/chain.json"
