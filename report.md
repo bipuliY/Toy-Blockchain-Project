@@ -82,3 +82,37 @@ This project does not include:
     Database integration.
 
 Therefore, this project should be considered a learning-based toy blockchain, not a production blockchain.
+5. Project Folder Structure
+
+The project is organized into separate packages. This improves readability and maintainability.
+
+                toy-blockchain/
+                │
+                ├── block/
+                │   ├── block.go
+                │   └── block_test.go
+                │
+                ├── chain/
+                │   ├── chain.go
+                │   └── chain_test.go
+                │
+                ├── cmd/
+                │   └── toychain/
+                │       └── main.go
+                │
+                ├── data/
+                │   └── chain.json
+                │
+                ├── internal/
+                │   └── transaction/
+                │       └── transaction.go
+                │
+                ├── ledger/
+                │   └── ledger.go
+                │
+                ├── storage/
+                │   ├── storage.go
+                │   └── storage_test.go
+                │
+                ├── go.mod
+                └── README.md
