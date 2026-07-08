@@ -1,15 +1,15 @@
 package main
-
+//imported packages
 import (
-	"errors"
-	"flag"
-	"fmt"
-	"os"
-	"sort"
+	"errors"   //use to check file loading errors
+	"flag"    // use to parse command line flags like -from , -to , -amount
+	"fmt"   
+	"os" 	//use to read terminal arguments and exit the program
+	"sort"	//use to sort acc names before printing balances
 
-	"toy-blockchain/chain"
-	"toy-blockchain/internal/transaction"
-	"toy-blockchain/storage"
+	"toy-blockchain/chain"  //Handles blockchain, blocks, mining, validation, balances
+	"toy-blockchain/internal/transaction" //Creates transaction objects
+	"toy-blockchain/storage"  //Saves and loads blockchain data from JSON file
 )
 
 const defaultDataFile = "data/chain.json"
