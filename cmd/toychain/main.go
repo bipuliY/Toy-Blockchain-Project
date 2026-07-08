@@ -12,7 +12,7 @@ import (
 	"toy-blockchain/storage"  //Saves and loads blockchain data from JSON file
 )
 
-const defaultDataFile = "data/chain.json"
+const defaultDataFile = "data/chain.json" //changes savee dto this path
 
 type commonOptions struct {
 	file       string
