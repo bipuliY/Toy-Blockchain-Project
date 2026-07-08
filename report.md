@@ -32,3 +32,53 @@ For learning purposes, this project simplifies the blockchain concept and focuse
     How blocks are connected using hashes.
     How blockchain validation detects tampering.
     How account balances can be calculated from transactions.
+    
+3. Project Objectives
+
+The main objectives of this project are:
+
+    To implement a simple blockchain using Go.
+    To create a command line interface for interacting with the blockchain.
+    To add transactions into a pending transaction pool.
+    To mine pending transactions into new blocks.
+    To use proof of work during block mining.
+    To store blockchain data in a JSON file.
+    To validate the blockchain after each operation.
+    To calculate account balances from confirmed transactions.
+    To deliberately tamper with blockchain data and observe validation failure.
+    To understand how blockchain protects data integrity.
+
+4. Scope of the Project
+
+This project includes the basic blockchain operations required for educational demonstration.
+
+Included in the Scope
+    Blockchain initialization.
+    Genesis block creation.
+    Transaction creation.
+    Pending transaction pool.
+    Block mining.
+    Proof-of-work difficulty.
+    Blockchain printing.
+    Blockchain validation.
+    Balance calculation.
+    Pending transaction viewing.
+    Tamper testing.
+    JSON-based data storage.
+    Unit testing for important packages.
+    Not Included in the Scope
+
+This project does not include:
+
+    Real cryptocurrency wallets.
+    Digital signatures.
+    Peer-to-peer network.
+    Distributed mining.
+    Smart contracts.
+    Real financial transactions.
+    Merkle trees.
+    User authentication.
+    Web interface.
+    Database integration.
+
+Therefore, this project should be considered a learning-based toy blockchain, not a production blockchain.
