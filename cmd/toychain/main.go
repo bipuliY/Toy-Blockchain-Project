@@ -133,6 +133,7 @@ func runAdd(args []string) error {
 	return nil
 }
 
+//Mining takes pending transactions and puts them into a new block.
 func runMine(args []string) error {
 	fs := flag.NewFlagSet("mine", flag.ExitOnError)
 	opts := addCommonFlags(fs)
@@ -271,7 +272,7 @@ func runBalances(args []string) error {
 	return nil
 }
 
-func runPending(args []string) error {
+func runPending(args []string) error {  //This creates a new flag set for the command pending.
 	fs := flag.NewFlagSet("pending", flag.ExitOnError)
 	opts := addCommonFlags(fs)
 	if err := fs.Parse(args); err != nil {
@@ -282,8 +283,8 @@ func runPending(args []string) error {
 	if err != nil {
 		return err
 	}
-
-	if len(bc.PendingTransactions) == 0 {
+//This checks whether there are any pending transactions.
+	if len(bc.PendingTransactions) == 0 { 
 		fmt.Println("No pending transactions")
 		return nil
 	}
@@ -296,9 +297,10 @@ func runPending(args []string) error {
 	return nil
 }
 
+
 func runTamper(args []string) error {
 	fs := flag.NewFlagSet("tamper", flag.ExitOnError)
-	opts := addCommonFlags(fs)
+	opts := addCommonFlags(fs)   
 	blockIndex := fs.Int("block", 1, "block height to tamper")
 	txIndex := fs.Int("tx", 0, "transaction index inside the block")
 	newAmount := fs.Int("amount", 999, "new amount to write without recalculating hash")

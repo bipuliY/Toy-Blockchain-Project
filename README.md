@@ -354,6 +354,8 @@ go run ./cmd/toychain validate
 
 ---
 
+---
+
 ## How It Works
 
 The application follows this simple flow:
@@ -374,6 +376,64 @@ Result is printed in terminal
 
 ---
 
+
+
+---
+## Deterministic SHA-256 Block Hashing
+
+This project uses deterministic SHA-256 hashing to calculate the hash of each block.
+
+A block hash is generated from the block data in a fixed field order. This means the same block data will always produce the same hash when the same values are used.
+
+### Fields included in the block hash
+
+The following fields are included in the hash calculation in this exact order:
+
+1. Block height / index
+2. Timestamp
+3. Previous block hash
+4. Nonce
+5. Transactions
+
+Each transaction is also added in a fixed order:
+
+1. From account
+2. To account
+3. Amount
+
+The current block hash field itself is **not** included when calculating the hash. This is because the hash is the final output of the calculation.
+
+### Hash input format
+
+The block hash is calculated using the following logical format:
+
+```text
+height | timestamp | previousHash | nonce | transactions
+```
+
+Each transaction is represented using this format:
+
+```text
+from | to | amount
+```
+
+Example logical input:
+
+```text
+1|2026-07-09T10:30:00Z|000abc...|45|Alice|Bob|25
+```
+
+After this deterministic input string is created, the SHA-256 algorithm is applied to generate the final block hash.
+
+### Why this is important
+
+The field order is documented to make hashing deterministic, testable, and easy to verify.
+
+If the same block data is used with the same field order, the generated SHA-256 hash will always be the same. If any block field or transaction value is changed, the hash will also change. This allows the `validate` command to detect tampering.
+
+This hashing behavior is tested in `block_test.go`.
+
+---
 ## Main Blockchain Concepts Demonstrated
 
 ### Block
