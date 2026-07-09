@@ -15,19 +15,19 @@ import (
 const defaultDataFile = "data/chain.json" //changes savee dto this path
 
 type commonOptions struct {
-	file       string
-	difficulty int
-	blockSize  int
+	file       string //Where to save/load blockchain JSON
+	difficulty int    //Mining difficulty
+	blockSize  int    //Maximum transactions per block
 }
 
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
-		os.Exit(1)
+		os.Exit(1)  //If you run without command, it prints help and exits.
 	}
 
-	command := os.Args[1]
-	args := os.Args[2:]
+	command := os.Args[1]  //The first argument is the command (init, add, mine, print, validate, balances, pending, tamper)
+	args := os.Args[2:]		//The rest of the arguments are passed to the command handler
 
 	var err error
 
@@ -57,9 +57,10 @@ func main() {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1)
+		os.Exit(1)  //If any command returns an error, it prints the error and exits.
 	}
 }
+//This adds common flags to every command.
 
 func addCommonFlags(fs *flag.FlagSet) *commonOptions {
 	opts := &commonOptions{}
@@ -68,7 +69,7 @@ func addCommonFlags(fs *flag.FlagSet) *commonOptions {
 	fs.IntVar(&opts.blockSize, "block-size", chain.DefaultBlockSize, "maximum transactions per block for a new chain")
 	return opts
 }
-
+//This function tries to load the blockchain from JSON file.
 func loadOrCreate(opts *commonOptions) (*chain.Blockchain, error) {
 	bc, err := storage.Load(opts.file)
 	if err == nil {
@@ -82,6 +83,7 @@ func loadOrCreate(opts *commonOptions) (*chain.Blockchain, error) {
 	return nil, err
 }
 
+//It creates a new blockchain with a genesis block.
 func runInit(args []string) error {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	opts := addCommonFlags(fs)
@@ -106,13 +108,13 @@ func runAdd(args []string) error {
 	fs := flag.NewFlagSet("add", flag.ExitOnError)
 	opts := addCommonFlags(fs)
 	from := fs.String("from", "", "sender account")
-	to := fs.String("to", "", "recipient account")
+	to := fs.String("to", "", "recipient account")   //Read flags
 	amount := fs.Int("amount", 0, "transaction amount")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	bc, err := loadOrCreate(opts)
+	bc, err := loadOrCreate(opts)   //This loads existing blockchain from data/chain.json.
 	if err != nil {
 		return err
 	}
