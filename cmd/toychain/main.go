@@ -174,6 +174,8 @@ func runPrint(args []string) error {
 		return err
 	}
 
+	fmt.Println("--------Toy Blockchain CLI Project------")
+
 	fmt.Println("Blockchain")
 	fmt.Println("Difficulty:", bc.Difficulty)
 	fmt.Println("Block size:", bc.BlockSize)
@@ -182,15 +184,14 @@ func runPrint(args []string) error {
 
 	for _, blk := range bc.Blocks {
 		fmt.Println("----------------------------------------")
-		fmt.Println("--------Toy Blockchain CLI Project------")
-		fmt.Println("----------------------------------------")
 		fmt.Println("Height:", blk.Height)
 		fmt.Println("Timestamp:", blk.Timestamp)
 		fmt.Println("Previous hash:", blk.PrevHash)
 		fmt.Println("Nonce:", blk.Nonce)
 		fmt.Println("Hash:", blk.Hash)
 		fmt.Println("Transactions:")
-		fmt.Println("----------------------------------------")
+		
+
 
 		if len(blk.Transactions) == 0 {
 			fmt.Println("  none")
@@ -202,6 +203,8 @@ func runPrint(args []string) error {
 	}
 
 	fmt.Println("----------------------------------------")
+	fmt.Println()
+	fmt.Println()
 	return nil
 }
 
@@ -327,7 +330,7 @@ func runTamper(args []string) error {
 }
 
 func printUsage() {
-	fmt.Println("Toy Blockchain CLI")
+	fmt.Println("--------Toy Blockchain CLI Project------")
 	fmt.Println()
 	fmt.Println("Commands:")
 	fmt.Println("  init       Create a new blockchain file")

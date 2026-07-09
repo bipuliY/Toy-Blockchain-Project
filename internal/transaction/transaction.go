@@ -27,19 +27,19 @@ func (tx Transaction) IsFaucet() bool {
 
 func (tx Transaction) BasicValidate() error {
 	if strings.TrimSpace(tx.From) == "" {
-		return errors.New("sender is required")
+		return errors.New("error:sender is required")
 	}
 
 	if strings.TrimSpace(tx.To) == "" {
-		return errors.New("recipient is required")
+		return errors.New("error:recipient is required")
 	}
 
 	if tx.Amount <= 0 {
-		return errors.New("amount must be greater than zero")
+		return errors.New("error:amount must be greater than zero")
 	}
 
 	if strings.EqualFold(strings.TrimSpace(tx.From), strings.TrimSpace(tx.To)) {
-		return errors.New("sender and recipient cannot be the same")
+		return errors.New("error:sender and recipient cannot be the same")
 	}
 
 	return nil
