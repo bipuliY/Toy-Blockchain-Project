@@ -182,12 +182,15 @@ func runPrint(args []string) error {
 
 	for _, blk := range bc.Blocks {
 		fmt.Println("----------------------------------------")
+		fmt.Println("--------Toy Blockchain CLI Project------")
+		fmt.Println("----------------------------------------")
 		fmt.Println("Height:", blk.Height)
 		fmt.Println("Timestamp:", blk.Timestamp)
 		fmt.Println("Previous hash:", blk.PrevHash)
 		fmt.Println("Nonce:", blk.Nonce)
 		fmt.Println("Hash:", blk.Hash)
 		fmt.Println("Transactions:")
+		fmt.Println("----------------------------------------")
 
 		if len(blk.Transactions) == 0 {
 			fmt.Println("  none")
