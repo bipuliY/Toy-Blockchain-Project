@@ -6,18 +6,6 @@
 
 ---
 
-## Student Details
-
-| Item                 | Details                             |
-| -------------------- | ----------------------------------- |
-| Student Name         | Your Name                           |
-| Registration Number  | Your Registration Number            |
-| Course / Module      | Your Course Name                    |
-| Project Type         | Blockchain / Go Programming Project |
-| Programming Language | Go                                  |
-| Repository Name      | toy-blockchain                      |
-
----
 
 ## Abstract
 
