@@ -116,3 +116,23 @@ The project is organized into separate packages. This improves readability and m
                 │
                 ├── go.mod
                 └── README.md
+
+
+6. System Overview
+
+The system works as a command line application. The user enters a command in the terminal. The main.go file reads the command and calls the correct function.
+
+For example:
+
+    go run ./cmd/toychain add -from Alice -to Bob -amount 50
+
+The system then:
+
+    Reads the command.
+    Loads the blockchain from data/chain.json.
+    Creates a transaction.
+    Adds it to the pending transaction pool.
+    Saves the updated blockchain.
+    Prints a success message.
+
+The blockchain is not stored only in memory. It is saved into a JSON file. Therefore, the chain can be reused later.
