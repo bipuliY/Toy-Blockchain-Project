@@ -365,7 +365,7 @@ User enters CLI command
         ↓
 main.go reads the command
         ↓
-Blockchain is loaded from JSON file
+Blockchain is loaded from JSON file (requires an existing chain file)
         ↓
 Requested operation is executed
         ↓
@@ -373,6 +373,8 @@ Blockchain is saved back to JSON file
         ↓
 Result is printed in terminal
 ```
+
+If the configured JSON file is missing, most commands return an error and the blockchain must be initialized first with `go run ./cmd/toychain init`.
 
 ---
 

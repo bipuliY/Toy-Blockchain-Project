@@ -1,15 +1,16 @@
 package main
+
 //imported packages
 import (
-	"errors"   //use to check file loading errors
-	"flag"    // use to parse command line flags like -from , -to , -amount
-	"fmt"   
-	"os" 	//use to read terminal arguments and exit the program
-	"sort"	//use to sort acc names before printing balances
+	"errors" //use to check file loading errors
+	"flag"   // use to parse command line flags like -from , -to , -amount
+	"fmt"
+	"os"   //use to read terminal arguments and exit the program
+	"sort" //use to sort acc names before printing balances
 
-	"toy-blockchain/chain"  //Handles blockchain, blocks, mining, validation, balances
+	"toy-blockchain/chain"                //Handles blockchain, blocks, mining, validation, balances
 	"toy-blockchain/internal/transaction" //Creates transaction objects
-	"toy-blockchain/storage"  //Saves and loads blockchain data from JSON file
+	"toy-blockchain/storage"              //Saves and loads blockchain data from JSON file
 )
 
 const defaultDataFile = "data/chain.json" //changes savee dto this path
@@ -23,11 +24,11 @@ type commonOptions struct {
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
-		os.Exit(1)  //If you run without command, it prints help and exits.
+		os.Exit(1) //If you run without command, it prints help and exits.
 	}
 
-	command := os.Args[1]  //The first argument is the command (init, add, mine, print, validate, balances, pending, tamper)
-	args := os.Args[2:]		//The rest of the arguments are passed to the command handler
+	command := os.Args[1] //The first argument is the command (init, add, mine, print, validate, balances, pending, tamper)
+	args := os.Args[2:]   //The rest of the arguments are passed to the command handler
 
 	var err error
 
@@ -57,9 +58,10 @@ func main() {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1)  //If any command returns an error, it prints the error and exits.
+		os.Exit(1) //If any command returns an error, it prints the error and exits.
 	}
 }
+
 //This adds common flags to every command.
 
 func addCommonFlags(fs *flag.FlagSet) *commonOptions {
@@ -69,21 +71,23 @@ func addCommonFlags(fs *flag.FlagSet) *commonOptions {
 	fs.IntVar(&opts.blockSize, "block-size", chain.DefaultBlockSize, "maximum transactions per block for a new chain")
 	return opts
 }
-//This function tries to load the blockchain from JSON file.
-func loadOrCreate(opts *commonOptions) (*chain.Blockchain, error) {
+
+// This function tries to load an existing blockchain from JSON file.
+// If the file is missing, callers should initialize the chain using `init`.
+func loadExisting(opts *commonOptions) (*chain.Blockchain, error) {
 	bc, err := storage.Load(opts.file)
 	if err == nil {
 		return bc, nil
 	}
 
 	if errors.Is(err, os.ErrNotExist) {
-		return chain.NewBlockchain(opts.difficulty, opts.blockSize), nil
+		return nil, fmt.Errorf("blockchain file missing: %s (run 'go run ./cmd/toychain init' first)", opts.file)
 	}
 
 	return nil, err
 }
 
-//It creates a new blockchain with a genesis block.
+// It creates a new blockchain with a genesis block.
 func runInit(args []string) error {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	opts := addCommonFlags(fs)
@@ -108,13 +112,13 @@ func runAdd(args []string) error {
 	fs := flag.NewFlagSet("add", flag.ExitOnError)
 	opts := addCommonFlags(fs)
 	from := fs.String("from", "", "sender account")
-	to := fs.String("to", "", "recipient account")   //Read flags
+	to := fs.String("to", "", "recipient account") //Read flags
 	amount := fs.Int("amount", 0, "transaction amount")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	bc, err := loadOrCreate(opts)   //This loads existing blockchain from data/chain.json.
+	bc, err := loadExisting(opts)
 	if err != nil {
 		return err
 	}
@@ -133,7 +137,7 @@ func runAdd(args []string) error {
 	return nil
 }
 
-//Mining takes pending transactions and puts them into a new block.
+// Mining takes pending transactions and puts them into a new block.
 func runMine(args []string) error {
 	fs := flag.NewFlagSet("mine", flag.ExitOnError)
 	opts := addCommonFlags(fs)
@@ -141,7 +145,7 @@ func runMine(args []string) error {
 		return err
 	}
 
-	bc, err := loadOrCreate(opts)
+	bc, err := loadExisting(opts)
 	if err != nil {
 		return err
 	}
@@ -172,7 +176,7 @@ func runPrint(args []string) error {
 		return err
 	}
 
-	bc, err := loadOrCreate(opts)
+	bc, err := loadExisting(opts)
 	if err != nil {
 		return err
 	}
@@ -193,8 +197,6 @@ func runPrint(args []string) error {
 		fmt.Println("Nonce:", blk.Nonce)
 		fmt.Println("Hash:", blk.Hash)
 		fmt.Println("Transactions:")
-		
-
 
 		if len(blk.Transactions) == 0 {
 			fmt.Println("  none")
@@ -218,7 +220,7 @@ func runValidate(args []string) error {
 		return err
 	}
 
-	bc, err := loadOrCreate(opts)
+	bc, err := loadExisting(opts)
 	if err != nil {
 		return err
 	}
@@ -243,7 +245,7 @@ func runBalances(args []string) error {
 		return err
 	}
 
-	bc, err := loadOrCreate(opts)
+	bc, err := loadExisting(opts)
 	if err != nil {
 		return err
 	}
@@ -272,19 +274,19 @@ func runBalances(args []string) error {
 	return nil
 }
 
-func runPending(args []string) error {  //This creates a new flag set for the command pending.
+func runPending(args []string) error { //This creates a new flag set for the command pending.
 	fs := flag.NewFlagSet("pending", flag.ExitOnError)
 	opts := addCommonFlags(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	bc, err := loadOrCreate(opts)
+	bc, err := loadExisting(opts)
 	if err != nil {
 		return err
 	}
-//This checks whether there are any pending transactions.
-	if len(bc.PendingTransactions) == 0 { 
+	//This checks whether there are any pending transactions.
+	if len(bc.PendingTransactions) == 0 {
 		fmt.Println("No pending transactions")
 		return nil
 	}
@@ -297,10 +299,9 @@ func runPending(args []string) error {  //This creates a new flag set for the co
 	return nil
 }
 
-
 func runTamper(args []string) error {
 	fs := flag.NewFlagSet("tamper", flag.ExitOnError)
-	opts := addCommonFlags(fs)   
+	opts := addCommonFlags(fs)
 	blockIndex := fs.Int("block", 1, "block height to tamper")
 	txIndex := fs.Int("tx", 0, "transaction index inside the block")
 	newAmount := fs.Int("amount", 999, "new amount to write without recalculating hash")
@@ -308,7 +309,7 @@ func runTamper(args []string) error {
 		return err
 	}
 
-	bc, err := loadOrCreate(opts)
+	bc, err := loadExisting(opts)
 	if err != nil {
 		return err
 	}

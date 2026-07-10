@@ -208,7 +208,7 @@ The system then:
 5. Saves the updated blockchain.
 6. Prints a success message.
 
-The blockchain is not stored only in memory. It is saved into a JSON file. Therefore, the chain can be reused later.
+Because the project stores the blockchain data in a JSON file, the chain can be reused later. If the JSON file is missing, commands that read the chain fail and the user must run `go run ./cmd/toychain init` first.
 
 ---
 
@@ -1219,7 +1219,7 @@ Although this project demonstrates blockchain concepts clearly, it has several l
 2. It does not include networking between nodes.
 3. It does not use public/private key cryptography.
 4. It does not include digital signatures.
-5. It does not prevent a user from spending more than their balance.
+5. It prevents users from spending more than their available balance, but it is still a toy implementation.
 6. It does not include mining rewards.
 7. It does not include transaction fees.
 8. It does not include a real consensus mechanism.
