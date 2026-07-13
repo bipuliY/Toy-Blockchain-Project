@@ -23,7 +23,8 @@ func Load(path string) (*chain.Blockchain, error) {
 		bc.BlockSize = chain.DefaultBlockSize
 	}
 
-	if bc.Difficulty < 0 {
+	// If difficulty is missing or non-positive in the JSON, use the default.
+	if bc.Difficulty <= 0 {
 		bc.Difficulty = chain.DefaultDifficulty
 	}
 

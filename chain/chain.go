@@ -28,7 +28,8 @@ type ValidationResult struct {
 }
 
 func NewBlockchain(difficulty int, blockSize int) *Blockchain {
-	if difficulty < 0 {
+	// Treat zero or negative difficulty as unspecified and fall back to default.
+	if difficulty <= 0 {
 		difficulty = DefaultDifficulty
 	}
 
