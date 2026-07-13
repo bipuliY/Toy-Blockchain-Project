@@ -397,6 +397,7 @@ The following fields are included in the hash calculation in this exact order:
 4. Nonce
 5. Transactions
 
+
 Each transaction is also added in a fixed order:
 
 1. From account
