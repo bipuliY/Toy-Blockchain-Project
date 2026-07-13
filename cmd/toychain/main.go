@@ -3,6 +3,9 @@ package main
 // Toychain CLI entrypoint and command handlers.
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -35,6 +38,8 @@ func main() {
 	switch cmd {
 	case "init":
 		err = runInit(args)
+	case "genkey":
+		err = runGenKey(args)
 	case "add":
 		err = runAdd(args)
 	case "mine":
@@ -111,6 +116,7 @@ func runAdd(args []string) error {
 	from := fs.String("from", "", "sender account")
 	to := fs.String("to", "", "recipient account")
 	amount := fs.Int("amount", 0, "transaction amount")
+	sk := fs.String("sk", "", "sender private key in hex (32-byte seed or 64-byte key)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -121,6 +127,15 @@ func runAdd(args []string) error {
 	}
 
 	tx := transaction.New(*from, *to, *amount)
+	if !tx.IsFaucet() {
+		if *sk == "" {
+			return fmt.Errorf("private key required for non-faucet transaction")
+		}
+		if err := tx.Sign(*sk); err != nil {
+			return err
+		}
+	}
+
 	if err := bc.AddTransaction(tx); err != nil {
 		return err
 	}
@@ -335,6 +350,38 @@ func runTamper(args []string) error {
 	return nil
 }
 
+func runGenKey(args []string) error {
+	fs := flag.NewFlagSet("genkey", flag.ExitOnError)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	pub, priv, err := generateEd25519Keypair()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Private key (hex, 32-byte seed or 64-byte key):")
+	fmt.Println(priv)
+	fmt.Println()
+	fmt.Println("Public key (hex):")
+	fmt.Println(pub)
+	return nil
+}
+
+func generateEd25519Keypair() (pubHex, privHex string, err error) {
+	// Generate seed and keypair
+	seed := make([]byte, 32)
+	if _, err := rand.Read(seed); err != nil {
+		return "", "", err
+	}
+	priv := ed25519.NewKeyFromSeed(seed)
+	pub := priv.Public().(ed25519.PublicKey)
+	privHex = hex.EncodeToString([]byte(priv))
+	pubHex = hex.EncodeToString([]byte(pub))
+	return pubHex, privHex, nil
+}
+
 func printUsage() {
 	fmt.Println("--------Toy Blockchain CLI Project------")
 	fmt.Println()
@@ -351,6 +398,7 @@ func printUsage() {
 	fmt.Println("Examples:")
 	fmt.Println("  go run ./cmd/toychain init -difficulty 2")
 	fmt.Println("  go run ./cmd/toychain add -from FAUCET -to Alice -amount 100")
+	fmt.Println("  go run ./cmd/toychain add -from <pubkey-hex> -to Bob -amount 30 -sk <private-key-hex>")
 	fmt.Println("  go run ./cmd/toychain mine")
 	fmt.Println("  go run ./cmd/toychain add -from Alice -to Bob -amount 30")
 	fmt.Println("  go run ./cmd/toychain mine")
