@@ -1,38 +1,38 @@
 package main
 
-//imported packages
-import (
-	"errors" //use to check file loading errors
-	"flag"   // use to parse command line flags like -from , -to , -amount
-	"fmt"
-	"os"   //use to read terminal arguments and exit the program
-	"sort" //use to sort acc names before printing balances
+// Toychain CLI entrypoint and command handlers.
 
-	"toy-blockchain/chain"                //Handles blockchain, blocks, mining, validation, balances
-	"toy-blockchain/internal/transaction" //Creates transaction objects
-	"toy-blockchain/storage"              //Saves and loads blockchain data from JSON file
+import (
+	"errors"
+	"flag"
+	"fmt"
+	"os"
+	"sort"
+
+	"toy-blockchain/chain"
+	"toy-blockchain/internal/transaction"
+	"toy-blockchain/storage"
 )
 
-const defaultDataFile = "data/chain.json" //changes savee dto this path
+const defaultDataFile = "data/chain.json"
 
 type commonOptions struct {
-	file       string //Where to save/load blockchain JSON
-	difficulty int    //Mining difficulty
-	blockSize  int    //Maximum transactions per block
+	file       string
+	difficulty int
+	blockSize  int
 }
 
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
-		os.Exit(1) //If you run without command, it prints help and exits.
+		os.Exit(1)
 	}
 
-	command := os.Args[1] //The first argument is the command (init, add, mine, print, validate, balances, pending, tamper)
-	args := os.Args[2:]   //The rest of the arguments are passed to the command handler
+	cmd := os.Args[1]
+	args := os.Args[2:]
 
 	var err error
-
-	switch command {
+	switch cmd {
 	case "init":
 		err = runInit(args)
 	case "add":
@@ -53,16 +53,14 @@ func main() {
 		printUsage()
 		return
 	default:
-		err = fmt.Errorf("unknown command: %s", command)
+		err = fmt.Errorf("unknown command: %s", cmd)
 	}
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1) //If any command returns an error, it prints the error and exits.
+		os.Exit(1)
 	}
 }
-
-//This adds common flags to every command.
 
 func addCommonFlags(fs *flag.FlagSet) *commonOptions {
 	opts := &commonOptions{}
@@ -72,8 +70,8 @@ func addCommonFlags(fs *flag.FlagSet) *commonOptions {
 	return opts
 }
 
-// This function tries to load an existing blockchain from JSON file.
-// If the file is missing, callers should initialize the chain using `init`.
+// loadExisting attempts to load the chain from disk and returns a clear error
+// if the file does not exist so callers can instruct the user to run `init`.
 func loadExisting(opts *commonOptions) (*chain.Blockchain, error) {
 	bc, err := storage.Load(opts.file)
 	if err == nil {
@@ -87,7 +85,6 @@ func loadExisting(opts *commonOptions) (*chain.Blockchain, error) {
 	return nil, err
 }
 
-// It creates a new blockchain with a genesis block.
 func runInit(args []string) error {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	opts := addCommonFlags(fs)
@@ -112,7 +109,7 @@ func runAdd(args []string) error {
 	fs := flag.NewFlagSet("add", flag.ExitOnError)
 	opts := addCommonFlags(fs)
 	from := fs.String("from", "", "sender account")
-	to := fs.String("to", "", "recipient account") //Read flags
+	to := fs.String("to", "", "recipient account")
 	amount := fs.Int("amount", 0, "transaction amount")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -137,7 +134,6 @@ func runAdd(args []string) error {
 	return nil
 }
 
-// Mining takes pending transactions and puts them into a new block.
 func runMine(args []string) error {
 	fs := flag.NewFlagSet("mine", flag.ExitOnError)
 	opts := addCommonFlags(fs)
@@ -181,8 +177,12 @@ func runPrint(args []string) error {
 		return err
 	}
 
-	fmt.Println("--------Toy Blockchain CLI Project------")
+	printChain(bc)
+	return nil
+}
 
+func printChain(bc *chain.Blockchain) {
+	fmt.Println("--------Toy Blockchain CLI Project------")
 	fmt.Println("Blockchain")
 	fmt.Println("Difficulty:", bc.Difficulty)
 	fmt.Println("Block size:", bc.BlockSize)
@@ -209,8 +209,6 @@ func runPrint(args []string) error {
 
 	fmt.Println("----------------------------------------")
 	fmt.Println()
-	fmt.Println()
-	return nil
 }
 
 func runValidate(args []string) error {
@@ -250,14 +248,19 @@ func runBalances(args []string) error {
 		return err
 	}
 
+	printBalances(bc, *includePending)
+	return nil
+}
+
+func printBalances(bc *chain.Blockchain, includePending bool) {
 	balances := bc.Balances()
-	if *includePending {
+	if includePending {
 		balances = bc.BalancesIncludingPending()
 	}
 
 	if len(balances) == 0 {
 		fmt.Println("No balances yet")
-		return nil
+		return
 	}
 
 	accounts := make([]string, 0, len(balances))
@@ -270,11 +273,9 @@ func runBalances(args []string) error {
 	for _, account := range accounts {
 		fmt.Printf("%s: %d\n", account, balances[account])
 	}
-
-	return nil
 }
 
-func runPending(args []string) error { //This creates a new flag set for the command pending.
+func runPending(args []string) error {
 	fs := flag.NewFlagSet("pending", flag.ExitOnError)
 	opts := addCommonFlags(fs)
 	if err := fs.Parse(args); err != nil {
@@ -285,7 +286,7 @@ func runPending(args []string) error { //This creates a new flag set for the com
 	if err != nil {
 		return err
 	}
-	//This checks whether there are any pending transactions.
+
 	if len(bc.PendingTransactions) == 0 {
 		fmt.Println("No pending transactions")
 		return nil
