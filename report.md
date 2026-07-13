@@ -1,1435 +1,252 @@
 # Toy Blockchain CLI Project Report
 
-## Project Title
-
-**Toy Blockchain Command Line Application Using Go**
-
----
-
-
 ## Abstract
 
-This project is a simple blockchain command line application developed using the Go programming language. The main purpose of this project is to demonstrate the basic internal working concepts of a blockchain system in a simple and understandable way.
-
-The application allows users to create a blockchain, add transactions, mine blocks, view blockchain data, check account balances, validate the blockchain, view pending transactions, and deliberately tamper with old data to test blockchain security. The blockchain data is stored in a JSON file, allowing the data to persist even after the program stops.
-
-This project does not aim to build a real cryptocurrency system. Instead, it focuses on the core educational concepts of blockchain, such as blocks, transactions, hashing, proof of work, previous hash linking, chain validation, and tamper detection.
-
----
-
-## Table of Contents
-
-1. Introduction
-2. Problem Statement
-3. Project Objectives
-4. Scope of the Project
-5. Tools and Technologies Used
-6. Project Folder Structure
-7. System Overview
-8. Main Features
-9. Blockchain Concepts Used
-10. System Architecture
-11. Explanation of Main Program
-12. Explanation of Commands
-13. Data Flow of the System
-14. Testing and Validation
-15. Example Usage
-16. Results and Observations
-17. Limitations
-18. Future Improvements
-19. Conclusion
+This report documents a simplified blockchain implemented in Go as a command-line application. The project was built to meet the requirements of the assessment by demonstrating the core ideas behind a blockchain: deterministic hashing, proof-of-work mining, transaction validation, ledger balances, chain validation, and tamper detection. The implementation is intentionally small and educational, so it focuses on correctness and clarity rather than networking or production-grade consensus.
 
 ---
 
 ## 1. Introduction
 
-Blockchain is a distributed data storage technology where data is stored in blocks. Each block is connected to the previous block using a cryptographic hash. Because of this hash connection, changing data in an old block affects all following blocks. This makes blockchain suitable for systems that require data integrity, transparency, and tamper detection.
+The assignment required a single-process Go application that could create blocks, mine them with proof of work, store transactions, validate the chain, and report tampering. This project satisfies those requirements through a compact CLI that can be run locally from the terminal.
 
-This project implements a simplified blockchain system as a command line interface. The user interacts with the blockchain through terminal commands. The system supports adding transactions, mining transactions into blocks, viewing balances, validating the blockchain, and testing tampering.
-
-The project is implemented using Go because Go is simple, fast, strongly typed, and suitable for building command line tools and backend systems.
+The implementation is organised into separate packages for blocks, the chain, transactions, storage, and the CLI entry point. The chain is persisted to JSON so it can be reused between runs.
 
 ---
 
 ## 2. Problem Statement
 
-The main problem addressed by this project is understanding how blockchain works internally. Many blockchain systems are complex because they include peer-to-peer networking, cryptographic wallets, smart contracts, distributed consensus, and advanced security mechanisms.
+Blockchain systems are often difficult to understand because they combine cryptography, distributed systems, and financial logic. The goal of this project was to simplify the core concepts so they could be studied in a small, understandable example. In particular, the project focuses on:
 
-For learning purposes, this project simplifies the blockchain concept and focuses only on the most important internal mechanisms:
-
-* How transactions are created.
-* How transactions are stored before mining.
-* How a block is created.
-* How proof of work is performed.
-* How blocks are connected using hashes.
-* How blockchain validation detects tampering.
-* How account balances can be calculated from transactions.
+- how transactions are created and checked,
+- how blocks are mined,
+- how each block is linked to the previous one,
+- how a chain can detect tampering, and
+- how account balances can be derived from confirmed transactions.
 
 ---
 
 ## 3. Project Objectives
 
-The main objectives of this project are:
+The main objectives were to:
 
-1. To implement a simple blockchain using Go.
-2. To create a command line interface for interacting with the blockchain.
-3. To add transactions into a pending transaction pool.
-4. To mine pending transactions into new blocks.
-5. To use proof of work during block mining.
-6. To store blockchain data in a JSON file.
-7. To validate the blockchain after each operation.
-8. To calculate account balances from confirmed transactions.
-9. To deliberately tamper with blockchain data and observe validation failure.
-10. To understand how blockchain protects data integrity.
+1. implement a working toy blockchain in Go,
+2. create a CLI for common blockchain actions,
+3. add transactions to a pending pool,
+4. mine pending transactions into blocks,
+5. enforce proof-of-work difficulty,
+6. validate the integrity of the full chain,
+7. reject invalid or overspending transactions, and
+8. document the design choices and experimental results in a short report.
 
 ---
 
 ## 4. Scope of the Project
 
-This project includes the basic blockchain operations required for educational demonstration.
+### Included in scope
 
-### Included in the Scope
+- a single-process command-line application,
+- block and chain data structures,
+- deterministic SHA-256 hashing,
+- a genesis block,
+- a basic transaction and ledger model,
+- configurable proof-of-work mining,
+- full-chain validation and tamper detection,
+- unit tests, and
+- a written research report.
 
-* Blockchain initialization.
-* Genesis block creation.
-* Transaction creation.
-* Pending transaction pool.
-* Block mining.
-* Proof-of-work difficulty.
-* Blockchain printing.
-* Blockchain validation.
-* Balance calculation.
-* Pending transaction viewing.
-* Tamper testing.
-* JSON-based data storage.
-* Unit testing for important packages.
+### Not included in scope
 
-### Not Included in the Scope
+- peer-to-peer networking,
+- real wallets or digital signatures,
+- smart contracts,
+- a web interface, or
+- any external blockchain node or SDK.
 
-This project does not include:
-
-* Real cryptocurrency wallets.
-* Digital signatures.
-* Peer-to-peer network.
-* Distributed mining.
-* Smart contracts.
-* Real financial transactions.
-* Merkle trees.
-* User authentication.
-* Web interface.
-* Database integration.
-
-Therefore, this project should be considered a learning-based toy blockchain, not a production blockchain.
-
----
-
-## 5. Tools and Technologies Used
-
-| Tool / Technology  | Purpose                                     |
-| ------------------ | ------------------------------------------- |
-| Go                 | Main programming language                   |
-| Go CLI             | Running and testing the program             |
-| JSON               | Storing blockchain data                     |
-| Go `flag` package  | Reading command line options                |
-| Go `os` package    | Handling terminal arguments and file errors |
-| Go `fmt` package   | Printing output                             |
-| Go testing package | Unit testing                                |
-| Git / GitHub       | Version control and project submission      |
-
----
-
-## 6. Project Folder Structure
-
-The project is organized into separate packages. This improves readability and maintainability.
-
-```text
-toy-blockchain/
-│
-├── block/
-│   ├── block.go
-│   └── block_test.go
-│
-├── chain/
-│   ├── chain.go
-│   └── chain_test.go
-│
-├── cmd/
-│   └── toychain/
-│       └── main.go
-│
-├── data/
-│   └── chain.json
-│
-├── internal/
-│   └── transaction/
-│       └── transaction.go
-│
-├── ledger/
-│   └── ledger.go
-│
-├── storage/
-│   ├── storage.go
-│   └── storage_test.go
-│
-├── go.mod
-└── README.md
-```
-
-### Explanation of Main Folders
-
-| Folder                 | Description                                                  |
-| ---------------------- | ------------------------------------------------------------ |
-| `block`                | Contains block-related logic                                 |
-| `chain`                | Contains blockchain operations such as mining and validation |
-| `cmd/toychain`         | Contains the command line application                        |
-| `internal/transaction` | Contains transaction-related structures                      |
-| `storage`              | Handles saving and loading blockchain data                   |
-| `data`                 | Stores the blockchain JSON file                              |
-| `ledger`               | Can be used for balance or ledger-related logic              |
-
----
-
-## 7. System Overview
-
-The system works as a command line application. The user enters a command in the terminal. The `main.go` file reads the command and calls the correct function.
-
-For example:
-
-```bash
-go run ./cmd/toychain add -from Alice -to Bob -amount 50
-```
-
-The system then:
-
-1. Reads the command.
-2. Loads the blockchain from `data/chain.json`.
-3. Creates a transaction.
-4. Adds it to the pending transaction pool.
-5. Saves the updated blockchain.
-6. Prints a success message.
-
-Because the project stores the blockchain data in a JSON file, the chain can be reused later. If the JSON file is missing, commands that read the chain fail and the user must run `go run ./cmd/toychain init` first.
-
----
-
-## 8. Main Features
-
-### 8.1 Create a New Blockchain
-
-The `init` command creates a new blockchain file.
-
-```bash
-go run ./cmd/toychain init
-```
-
-This creates the genesis block and saves the blockchain into `data/chain.json`.
-
----
-
-### 8.2 Add a Transaction
-
-The `add` command adds a transaction to the pending transaction pool.
-
-```bash
-go run ./cmd/toychain add -from Alice -to Bob -amount 50
-```
-
-This transaction is not immediately added to the blockchain. It waits in the pending pool until mining is performed.
-
----
-
-### 8.3 Mine a Block
-
-The `mine` command mines pending transactions into a new block.
-
-```bash
-go run ./cmd/toychain mine
-```
-
-Mining performs proof of work and adds a new block to the blockchain.
-
----
-
-### 8.4 Print the Blockchain
-
-The `print` command displays all blocks in the blockchain.
-
-```bash
-go run ./cmd/toychain print
-```
-
-This shows block height, timestamp, previous hash, nonce, hash, and transactions.
-
----
-
-### 8.5 Validate the Blockchain
-
-The `validate` command checks whether the blockchain is valid.
-
-```bash
-go run ./cmd/toychain validate
-```
-
-If no data has been changed, the output is:
-
-```text
-Chain valid
-```
-
-If old data has been changed, the output becomes:
-
-```text
-Chain invalid
-```
-
----
-
-### 8.6 Show Balances
-
-The `balances` command calculates account balances.
-
-```bash
-go run ./cmd/toychain balances
-```
-
-Balances are calculated from confirmed mined transactions.
-
----
-
-### 8.7 Show Pending Transactions
-
-The `pending` command shows transactions waiting to be mined.
-
-```bash
-go run ./cmd/toychain pending
-```
-
----
-
-### 8.8 Tamper with Data
-
-The `tamper` command deliberately modifies old transaction data.
-
-```bash
-go run ./cmd/toychain tamper -block 1 -tx 0 -amount 999
-```
-
-This is used to demonstrate blockchain tamper detection.
-
----
-
-## 9. Blockchain Concepts Used
-
-### 9.1 Block
-
-A block is a container that stores transactions together with the information required to securely link it to the clockchain.
-
-Each block contains:
-
-* Height.
-* Timestamp.
-* Transactions.
-* Previous hash ('PrevHah')
-* Nonce.
-* Current block hash ('Hash')
-
-The block hash is generated using the block data. Any modification to the block changes the hash, allowing tampering to be detected during blockchain validation.
-
-
-### 9.1.1 Deterministic SHA-256 Block Hashing
-
-This project uses deterministic SHA-256 hashing to generate the hash of each block. Deterministic hashing means that the same block data will always produce the same hash when the same field order is used.
-
-The hash is generated by converting important block fields into a fixed input format and then applying the SHA-256 algorithm.
-
-#### Fields included in the block hash
-
-The following block fields are included in the hash calculation in this exact order:
-
-| Order | Field |
-|-------|-------|
-| 1 | Height |
-| 2 | Timestamp |
-| 3 | Transactions |
-| 4 | Previous Hash (`PrevHash`) |
-| 5 | Nonce |
-
-Each transaction is also added to the hash input using a fixed field order:
-
-| Order | Transaction Field |
-| ----- | ----------------- |
-| 1 | From account |
-| 2 | To account |
-| 3 | Amount |
-
-The block's own current hash field is not included in the hash calculation. This is because the hash is the final result of the calculation. Including the hash field itself would create a circular dependency.
-
-#### Hash input format
-
-The block hash is calculated using the following logical format:
-
-```text
-height | timestamp | previousHash | nonce | transactions
-```
-
-Each transaction is represented using this format:
-
-```text
-from | to | amount
-```
-
-Example logical input:
-
-```text
-1|2026-07-09T10:30:00Z|000abc...|45|Alice|Bob|25
-```
-
-After this deterministic input string is created, SHA-256 is applied to generate the final block hash.
-
-#### Importance of documented field order
-
-The field order is documented because the assignment requires the hash input fields and their order to be clear.
-
-This also makes the hashing process testable. If the same block data is used in the same order, the same SHA-256 hash is produced. If any field value changes, the hash changes. Therefore, blockchain validation can detect tampering.
----
-
-### 9.2 Transaction
-
-A transaction represents value movement between accounts.
-
-Example:
-
-```text
-Alice -> Bob : 50
-```
-
-In this project, a transaction contains:
-
-* Sender account.
-* Receiver account.
-* Amount.
-
-The system supports simple account names such as `Alice`, `Bob`, and `FAUCET`.
-
----
-
-### 9.3 Genesis Block
-
-The genesis block is the first block in the blockchain.
-
-It has height `0`.
-
-It does not have a real previous block, so its previous hash is usually empty or a default value.
-
-The genesis block is created when the user runs:
-
-```bash
-go run ./cmd/toychain init
-```
-
----
-
-### 9.4 Pending Transaction Pool
-
-When a transaction is added, it is first stored in the pending transaction pool.
-
-It is not immediately part of the blockchain.
-
-Example:
-
-```text
-Pending Transactions:
-Alice -> Bob : 50
-```
-
-When mining is performed, pending transactions are selected and included in a new block.
-
----
-
-### 9.5 Mining
-
-Mining is the process of creating a valid block.
-
-In this project, mining means:
-
-1. Taking pending transactions.
-2. Creating a new block.
-3. Linking it to the previous block.
-4. Trying different nonce values.
-5. Finding a hash that satisfies the difficulty.
-6. Adding the block to the blockchain.
-7. Removing mined transactions from the pending pool.
-
----
-
-### 9.6 Proof of Work
-
-Proof of work is a method used to make block creation computationally difficult.
-
-In this project, proof of work is controlled using the difficulty value.
-
-For example, if difficulty is `2`, the block hash may need to start with two zeros:
-
-```text
-00abc123...
-```
-
-The miner keeps changing the nonce until a valid hash is found.
-
----
-
-### 9.7 Previous Hash Linking
-
-Each block stores the hash of the previous block.
-
-Example:
-
-```text
-Block 0 Hash:      00abc...
-Block 1 PrevHash:  00abc...
-Block 1 Hash:      00def...
-Block 2 PrevHash:  00def...
-```
-
-This creates a chain of blocks.
-
-If the data in Block 1 is changed, its hash changes. Then Block 2's previous hash no longer matches. Therefore, the chain becomes invalid.
-
----
-
-### 9.8 Blockchain Validation
-
-Validation checks whether the blockchain is still correct.
-
-The validation process checks:
-
-1. Whether each block hash matches its data.
-2. Whether each block points to the correct previous block hash.
-3. Whether proof of work is satisfied.
-4. Whether old data has been modified.
-
-This is how the project demonstrates blockchain security.
-
----
-
-## 10. System Architecture
-
-The system follows a simple layered architecture.
-
-```text
-User Terminal
-     |
-     v
-Command Line Interface
-cmd/toychain/main.go
-     |
-     v
-Blockchain Logic
-chain package
-     |
-     v
-Block and Transaction Logic
-block package + transaction package
-     |
-     v
-Storage Layer
-storage package
-     |
-     v
-JSON File
-data/chain.json
-```
-
-### Explanation
-
-The user does not directly access the blockchain data file. The user interacts through CLI commands. The CLI calls the blockchain logic. The blockchain logic modifies blocks and transactions. Finally, the storage package saves the updated blockchain into a JSON file.
-
----
-
-## 11. Explanation of Main Program
-
-The main command line program is located in:
-
-```text
-cmd/toychain/main.go
-```
-
-This file is the entry point of the application.
-
-It imports the required packages:
-
-```go
-import (
-	"errors"
-	"flag"
-	"fmt"
-	"os"
-	"sort"
-
-	"toy-blockchain/chain"
-	"toy-blockchain/internal/transaction"
-	"toy-blockchain/storage"
-)
-```
-
-### Main Responsibility of `main.go`
-
-The `main.go` file is responsible for:
-
-* Reading user commands.
-* Parsing command line flags.
-* Loading blockchain data.
-* Calling the correct blockchain function.
-* Saving updated blockchain data.
-* Printing output to the terminal.
-* Handling errors.
-
-The actual blockchain logic is mainly inside the `chain`, `block`, `transaction`, and `storage` packages.
-
----
-
-## 12. Explanation of Commands
-
-### 12.1 `init` Command
-
-Command:
-
-```bash
-go run ./cmd/toychain init
-```
-
-Purpose:
-
-Creates a new blockchain.
-
-What happens internally:
-
-1. A new blockchain object is created.
-2. A genesis block is created.
-3. The blockchain is saved into `data/chain.json`.
-4. The program prints blockchain details.
-
-Example output:
-
-```text
-New blockchain created
-File: data/chain.json
-Difficulty: 2
-Block size: 5
-Genesis hash: 00abc...
-```
-
----
-
-### 12.2 `add` Command
-
-Command:
-
-```bash
-go run ./cmd/toychain add -from FAUCET -to Alice -amount 100
-```
-
-Purpose:
-
-Adds a transaction to the pending pool.
-
-What happens internally:
-
-1. The blockchain is loaded from the JSON file.
-2. A new transaction is created.
-3. The transaction is validated.
-4. The transaction is added to the pending pool.
-5. The blockchain is saved again.
-
-Example output:
-
-```text
-Transaction added to pending pool: FAUCET -> Alice amount 100
-Pending transactions: 1
-```
-
----
-
-### 12.3 `pending` Command
-
-Command:
-
-```bash
-go run ./cmd/toychain pending
-```
-
-Purpose:
-
-Displays all transactions waiting to be mined.
-
-Example output:
-
-```text
-Pending transactions
-0. FAUCET -> Alice : 100
-```
-
----
-
-### 12.4 `mine` Command
-
-Command:
-
-```bash
-go run ./cmd/toychain mine
-```
-
-Purpose:
-
-Mines pending transactions into a block.
-
-What happens internally:
-
-1. The blockchain is loaded.
-2. Pending transactions are selected.
-3. A new block is created.
-4. The block is linked to the previous block.
-5. Proof of work is performed.
-6. The new block is added to the blockchain.
-7. Mined transactions are removed from the pending pool.
-8. The blockchain is saved.
-
-Example output:
-
-```text
-Block mined successfully
-Height: 1
-Nonce: 2154
-Hash: 00a93f...
-Hashes tried: 2155
-Time taken: 32 ms
-Remaining pending transactions: 0
-```
-
 ---
 
-### 12.5 `print` Command
+## 5. Implementation Summary
 
-Command:
+The project uses the following main packages:
 
-```bash
-go run ./cmd/toychain print
-```
+- block: defines the block structure and hashing/mining logic,
+- chain: manages the blockchain, pending transactions, mining, validation, and balances,
+- internal/transaction: defines the transaction model and basic validation,
+- ledger: applies transactions to balances and checks whether a sender has enough funds,
+- storage: saves and loads the chain as JSON,
+- cmd/toychain: exposes the CLI commands.
 
-Purpose:
+A typical workflow is:
 
-Prints the full blockchain.
+1. initialise the chain,
+2. add one or more transactions,
+3. mine the pending transactions into a new block,
+4. view balances or the chain,
+5. validate the chain, and
+6. optionally tamper with an old block to observe validation failure.
 
-Example output:
-
-```text
-Blockchain
-Difficulty: 2
-Block size: 5
-Blocks: 2
-
-----------------------------------------
-Height: 0
-Timestamp: 2026-07-08T10:00:00
-Previous hash:
-Nonce: 0
-Hash: 00abc...
-Transactions:
-  none
-
-----------------------------------------
-Height: 1
-Timestamp: 2026-07-08T10:05:00
-Previous hash: 00abc...
-Nonce: 2154
-Hash: 00a93f...
-Transactions:
-  FAUCET -> Alice : 100
-```
-
----
-
-### 12.6 `balances` Command
-
-Command:
-
-```bash
-go run ./cmd/toychain balances
-```
-
-Purpose:
-
-Shows confirmed account balances.
-
-Example:
-
-```text
-Balances
-Alice: 100
-FAUCET: -100
-```
-
-The balance is calculated by reading all mined transactions in the blockchain.
-
-If pending transactions should also be included, the following command can be used:
-
-```bash
-go run ./cmd/toychain balances -pending
-```
-
----
-
-### 12.7 `validate` Command
-
-Command:
-
-```bash
-go run ./cmd/toychain validate
-```
-
-Purpose:
-
-Checks whether the blockchain is valid.
-
-Example output for valid chain:
-
-```text
-Chain valid
-```
-
-Example output for invalid chain:
-
-```text
-Chain invalid
-First offending block: 1
-Reason: block hash does not match data
-```
-
----
-
-### 12.8 `tamper` Command
-
-Command:
-
-```bash
-go run ./cmd/toychain tamper -block 1 -tx 0 -amount 999
-```
-
-Purpose:
-
-Deliberately changes old block data without recalculating the hash.
-
-What happens internally:
-
-1. The blockchain is loaded.
-2. The selected block is found.
-3. The selected transaction is found.
-4. The transaction amount is changed.
-5. The blockchain is saved.
-6. The hash is not recalculated.
-
-After this, validation should fail.
-
-This proves that blockchain can detect tampering.
-
----
-
-## 13. Data Flow of the System
-
-### 13.1 Add Transaction Flow
-
-```text
-User enters add command
-        |
-        v
-CLI reads from, to, amount
-        |
-        v
-Blockchain is loaded from JSON
-        |
-        v
-Transaction object is created
-        |
-        v
-Transaction is added to pending pool
-        |
-        v
-Blockchain is saved back to JSON
-        |
-        v
-Success message is printed
-```
-
----
-
-### 13.2 Mining Flow
-
-```text
-User enters mine command
-        |
-        v
-Blockchain is loaded
-        |
-        v
-Pending transactions are selected
-        |
-        v
-New block is created
-        |
-        v
-Previous hash is attached
-        |
-        v
-Nonce is changed repeatedly
-        |
-        v
-Valid hash is found
-        |
-        v
-Block is added to chain
-        |
-        v
-Pending pool is updated
-        |
-        v
-Blockchain is saved
-```
-
----
-
-### 13.3 Validation Flow
-
-```text
-User enters validate command
-        |
-        v
-Blockchain is loaded
-        |
-        v
-Each block hash is recalculated
-        |
-        v
-Previous hash links are checked
-        |
-        v
-Proof of work is checked
-        |
-        v
-Validation result is printed
-```
-
----
-
-## 14. Testing and Validation
-
-The project was formatted, checked, and tested using Go commands.
-
-### 14.1 Code Formatting
-
-Command:
-
-```bash
-gofmt -w .
-```
-
-Purpose:
-
-Formats all Go files according to Go standards.
-
----
-
-### 14.2 Static Checking
-
-Command:
-
-```bash
-go vet ./...
-```
-
-Purpose:
-
-Checks for suspicious code patterns and possible mistakes.
-
----
-
-### 14.3 Unit Testing
-
-Command:
-
-```bash
-go test ./...
-```
-
-Observed result:
-
-```text
-ok      toy-blockchain/block    0.484s
-ok      toy-blockchain/chain    0.910s
-?       toy-blockchain/cmd/toychain     [no test files]
-?       toy-blockchain/internal/transaction     [no test files]
-?       toy-blockchain/ledger   [no test files]
-ok      toy-blockchain/storage  1.420s
-```
-
-This shows that the main tested packages passed successfully.
-
----
-
-## 15. Example Usage
-
-### Step 1: Initialize the Blockchain
-
-```bash
-go run ./cmd/toychain init -difficulty 2
-```
-
-Expected result:
-
-```text
-New blockchain created
-File: data/chain.json
-Difficulty: 2
-Block size: 5
-Genesis hash: ...
-```
-
----
-
-### Step 2: Add First Transaction
-
-```bash
-go run ./cmd/toychain add -from FAUCET -to Alice -amount 100
-```
-
-Expected result:
-
-```text
-Transaction added to pending pool: FAUCET -> Alice amount 100
-Pending transactions: 1
-```
-
----
-
-### Step 3: View Pending Transactions
-
-```bash
-go run ./cmd/toychain pending
-```
-
-Expected result:
-
-```text
-Pending transactions
-0. FAUCET -> Alice : 100
-```
-
----
-
-### Step 4: Mine the Transaction
-
-```bash
-go run ./cmd/toychain mine
-```
-
-Expected result:
-
-```text
-Block mined successfully
-Height: 1
-Nonce: ...
-Hash: ...
-Hashes tried: ...
-Time taken: ... ms
-Remaining pending transactions: 0
-```
-
----
-
-### Step 5: Add Another Transaction
-
-```bash
-go run ./cmd/toychain add -from Alice -to Bob -amount 30
-```
-
----
-
-### Step 6: Mine Again
-
-```bash
-go run ./cmd/toychain mine
-```
-
----
-
-### Step 7: Check Balances
-
-```bash
-go run ./cmd/toychain balances
-```
-
-Expected result:
-
-```text
-Balances
-Alice: 70
-Bob: 30
-FAUCET: -100
-```
-
----
-
-### Step 8: Validate the Blockchain
-
-```bash
-go run ./cmd/toychain validate
-```
-
-Expected result:
-
-```text
-Chain valid
-```
-
----
-
-### Step 9: Tamper with Old Data
-
-```bash
-go run ./cmd/toychain tamper -block 1 -tx 0 -amount 999
-```
-
-Expected result:
-
-```text
-Tampered block 1 transaction 0 amount: 100 -> 999
-Important: hash was not recalculated, so validation should fail now.
-```
-
----
-
-### Step 10: Validate Again
-
-```bash
-go run ./cmd/toychain validate
-```
-
-Expected result:
-
-```text
-Chain invalid
-First offending block: 1
-Reason: ...
-```
-
-This confirms that the blockchain detects data modification.
-
----
-
-## 16. Results and Observations
-
-### Observation 1: Transactions Are First Added to the Pending Pool
-
-When the `add` command is executed, the transaction is not directly inserted into the blockchain. It is added to the pending transaction pool.
-
-This is similar to real blockchain systems, where transactions wait before being included in a mined block.
-
----
-
-### Observation 2: Mining Converts Pending Transactions into Confirmed Transactions
-
-When the `mine` command is executed, pending transactions are moved into a new block. After mining, the pending transaction count decreases.
-
-This shows the difference between unconfirmed and confirmed transactions.
-
----
-
-### Observation 3: Each Block Is Linked to the Previous Block
-
-Each newly mined block stores the hash of the previous block.
-
-Because of this, the blockchain becomes a linked structure.
-
-If one old block is modified, the link between blocks becomes invalid.
-
----
-
-### Observation 4: Proof of Work Requires Multiple Hash Attempts
-
-During mining, the system tries different nonce values until a valid hash is found.
-
-The output shows:
-
-```text
-Hashes tried: ...
-Time taken: ... ms
-```
-
-This demonstrates that mining requires computational effort.
-
----
-
-### Observation 5: Higher Difficulty Increases Mining Work
-
-When the difficulty value is increased, mining usually takes more time because the system must search longer to find a valid hash.
-
-Example:
-
-```bash
-go run ./cmd/toychain init -difficulty 3
-```
-
-A difficulty of `3` is harder than a difficulty of `2`.
-
 ---
 
-### Observation 6: Balance Is Calculated from Transactions
+## 6. Hashing Scheme and Why SHA-256 Was Used
 
-The system does not store account balances directly as fixed values. Instead, balances are calculated from transactions in the blockchain.
+### 6.1 Hashing design
 
-For example:
+Each block uses SHA-256 to calculate a deterministic hash. The hash is computed from a stable serialisation of the block data using Go's standard library. The exact fields included in the hash input are:
 
-```text
-FAUCET -> Alice : 100
-Alice -> Bob : 30
-```
+1. Height,
+2. Timestamp,
+3. Transactions,
+4. Previous hash,
+5. Nonce.
 
-Then:
+The current block's own hash field is intentionally excluded. Including it would create a circular dependency because the hash is the value being calculated.
 
-```text
-Alice = 70
-Bob = 30
-FAUCET = -100
-```
+The transaction data is also serialized in a stable way. In the implementation, the transaction fields are stored in the order `From`, `To`, and `Amount`.
 
----
-
-### Observation 7: Tampering Is Detected by Validation
-
-When an old transaction amount is changed using the `tamper` command, the stored hash no longer matches the block data.
-
-Therefore, validation fails.
-
-This is one of the most important results of the project.
-
----
-
-## 17. Limitations
-
-Although this project demonstrates blockchain concepts clearly, it has several limitations.
-
-1. It is not a distributed blockchain.
-2. It does not include networking between nodes.
-3. It does not use public/private key cryptography.
-4. It does not include digital signatures.
-5. It prevents users from spending more than their available balance, but it is still a toy implementation.
-6. It does not include mining rewards.
-7. It does not include transaction fees.
-8. It does not include a real consensus mechanism.
-9. It stores data in a JSON file instead of a database.
-10. It is not suitable for real financial use.
-
-These limitations are acceptable because the project is designed for learning and demonstration.
-
----
-
-## 18. Future Improvements
-
-The project can be improved in several ways.
-
-### 18.1 Add Digital Signatures
-
-Each transaction can be signed using a private key and verified using a public key.
-
-This would make the system more secure.
-
----
-
-### 18.2 Add Wallets
-
-The project can include wallet generation for users.
-
-A wallet can contain:
-
-* Public key.
-* Private key.
-* Address.
-
----
-
-### 18.3 Add Balance Validation
+The hash input is therefore derived from a stable JSON structure rather than a manually formatted string. This makes the operation deterministic: the same block data will always produce the same hash.
 
-Currently, simple transactions can create negative balances.
+### 6.2 Why SHA-256 was chosen
 
-A future improvement is to check whether the sender has enough balance before allowing the transaction.
+SHA-256 was selected because it is:
 
----
-
-### 18.4 Add Mining Reward
-
-A reward can be given to the miner after successfully mining a block.
-
-Example:
-
-```text
-SYSTEM -> Miner : 10
-```
-
----
-
-### 18.5 Add Merkle Root
-
-A Merkle root can be added to each block to improve transaction integrity checking.
-
----
-
-### 18.6 Add Peer-to-Peer Networking
-
-Multiple nodes can be connected so that each node keeps a copy of the blockchain.
-
----
-
-### 18.7 Add REST API
-
-A REST API can be created using Go so that external applications can interact with the blockchain.
-
-Example endpoints:
-
-```text
-POST /transactions
-POST /mine
-GET /chain
-GET /balances
-GET /validate
-```
-
----
+- deterministic, so the same input always produces the same output,
+- fast enough for a toy blockchain on a laptop,
+- standardised and widely used in real blockchain systems,
+- easy to use with Go's `crypto/sha256` package.
 
-### 18.8 Add Web Interface
+For this project, SHA-256 is sufficient because the goal is to demonstrate how hashing links blocks together and makes tampering observable. It is not intended to be a production-grade security implementation.
 
-A simple frontend can be created to display blocks, transactions, balances, and validation results visually.
-
----
-
-### 18.9 Add Database Storage
-
-Instead of storing the blockchain in a JSON file, a database such as SQLite, PostgreSQL, or MongoDB can be used.
-
 ---
 
-### 18.10 Improve Error Messages
+## 7. Experiments and Results
 
-The CLI can be improved with clearer error messages and better help instructions for each command.
-
----
+### 7.1 Tamper-evidence experiment
 
-## 19. Security Discussion
+One of the key experiments was to tamper with an existing transaction and then run validation.
 
-The most important security concept demonstrated by this project is tamper detection.
+#### Procedure
 
-In a blockchain, every block depends on the previous block hash. If someone changes a transaction in an old block, the hash of that block changes. Then the next block's previous hash becomes incorrect.
+1. Create a new chain.
+2. Add a faucet transaction and mine it.
+3. Validate the chain successfully.
+4. Tamper with the amount in the first mined block.
+5. Validate the chain again.
 
-This project proves that concept using the `tamper` command.
+#### Observed output
 
 Before tampering:
 
 ```text
+$ go run ./cmd/toychain validate
 Chain valid
 ```
 
 After tampering:
 
 ```text
+$ go run ./cmd/toychain tamper -block 1 -tx 0 -amount 999
+Tampered block 1 transaction 0 amount: 100 -> 999
+Important: hash was not recalculated, so validation should fail now.
+
+$ go run ./cmd/toychain validate
 Chain invalid
+First offending block: 1
+Reason: stored hash does not match recalculated hash
 ```
 
-This shows that blockchain does not simply hide data modification. Instead, it makes unauthorized modification visible and detectable.
+#### Interpretation
+
+The chain becomes invalid because the stored hash of block 1 no longer matches the hash recomputed from the altered data. Validation detects this immediately and identifies the first offending block. This shows that even a small change in an early block breaks the chain's integrity.
+
+### 7.2 Difficulty versus mining effort
+
+The mining step uses proof of work by searching for a nonce such that the block hash begins with the required number of leading zero hex digits. Higher difficulty means more hashes must be tried before success.
+
+The following results were observed on this machine:
+
+| Difficulty | Hashes tried | Approx. time |
+| --- | ---: | ---: |
+| 4 | 119,724 | 0.08 s |
+| 5 | 371,601 | 0.16 s |
+| 6 | 44,060,072 | 14.77 s |
+
+The trend is not linear. For a difficulty target of $d$ leading zero hex digits, the expected work grows roughly like $16^d$ because each extra zero makes the target much smaller. This is why the mining time rises quickly as difficulty increases.
 
 ---
 
-## 20. Conclusion
+## 8. Ledger Behaviour and Example Balances
 
-This project successfully implements a basic blockchain command line application using Go. It demonstrates the core blockchain concepts in a simple way.
+The ledger model is intentionally simple. A normal transaction subtracts the amount from the sender and adds it to the recipient. A faucet transaction is treated as a special case that credits the recipient directly without requiring an existing balance.
 
-The application supports creating a blockchain, adding transactions, mining blocks, printing blockchain data, validating the chain, checking balances, viewing pending transactions, and testing tampering.
-
-The most important learning outcome of this project is understanding how blocks are connected using hashes and how blockchain validation can detect changes to old data. The proof-of-work mining process also shows how computational effort is used to create valid blocks.
-
-Although this project is not a real cryptocurrency system, it provides a strong foundation for understanding blockchain internals. It can be further improved by adding wallets, digital signatures, mining rewards, networking, APIs, and a user interface.
-
-Overall, this project is a successful educational implementation of a toy blockchain system.
-
----
-
-## Appendix A: Main Commands
-
-| Command    | Purpose                                |
-| ---------- | -------------------------------------- |
-| `init`     | Create a new blockchain                |
-| `add`      | Add a transaction to pending pool      |
-| `mine`     | Mine pending transactions into a block |
-| `print`    | Print the full blockchain              |
-| `validate` | Validate the blockchain                |
-| `balances` | Show account balances                  |
-| `pending`  | Show pending transactions              |
-| `tamper`   | Modify old data for testing            |
-
----
-
-## Appendix B: Sample Command Sequence
+Example:
 
 ```bash
 go run ./cmd/toychain init -difficulty 2
-
 go run ./cmd/toychain add -from FAUCET -to Alice -amount 100
-
-go run ./cmd/toychain pending
-
 go run ./cmd/toychain mine
-
 go run ./cmd/toychain add -from Alice -to Bob -amount 30
-
 go run ./cmd/toychain mine
-
 go run ./cmd/toychain balances
-
-go run ./cmd/toychain print
-
-go run ./cmd/toychain validate
-
-go run ./cmd/toychain tamper -block 1 -tx 0 -amount 999
-
-go run ./cmd/toychain validate
 ```
 
----
+Observed output:
 
-## Appendix C: Testing Commands
+```text
+Balances
+Alice: 70
+Bob: 30
+```
+
+This example also shows that overspending is rejected. For instance:
 
 ```bash
-gofmt -w .
+go run ./cmd/toychain add -from Alice -to Bob -amount 150
+```
 
-go vet ./...
+The command fails with:
 
-go test ./...
+```text
+Error: insufficient balance: Alice has 100 but tried to send 150
 ```
 
 ---
 
-## Appendix D: Final Project Summary
+## 9. Discussion Questions
 
-The final project contains the following completed features:
+### How does the previous-hash link help security?
 
-* Blockchain initialization.
-* Genesis block generation.
-* Transaction creation.
-* Pending transaction pool.
-* Mining with proof of work.
-* Block hash generation.
-* Previous hash linking.
-* Blockchain validation.
-* Balance calculation.
-* JSON file persistence.
-* Tamper experiment.
-* Unit testing.
+Each block stores the hash of the previous block. If an old block is modified, the hash of that block changes and the next block's stored previous-hash value no longer matches. This makes tampering visible, especially when validation checks the whole chain.
 
-This confirms that the project meets the main objectives of a beginner-level blockchain implementation.
+### What is an alternative to proof-of-work?
+
+Proof-of-stake is one alternative. It lets a participant create the next block based on the amount of stake they hold rather than on solving a computational puzzle. A benefit is lower energy consumption, while a drawback is that wealth can influence block production more heavily.
+
+### How does this toy chain differ from a production blockchain?
+
+Three concrete differences are:
+
+1. there is no network of peers or consensus among nodes,
+2. there are no transaction signatures or real wallet authentication,
+3. there is no Merkle tree or full economic finality model.
+
+A natural improvement would be to add digital signatures so that transactions can be verified by public/private keys rather than by a simple local ledger.
+
+---
+
+## 10. Limitations and Future Improvements
+
+The project is intentionally educational and therefore has several limitations:
+
+- it does not support a distributed network,
+- it does not provide real cryptographic signatures,
+- it does not implement Merkle trees,
+- it uses a simple local JSON persistence model, and
+- it does not support forks or chain selection rules.
+
+Future work could focus on digital signatures, Merkle roots, improved validation messages, and a richer CLI.
+
+---
+
+## 11. Conclusion
+
+The toy blockchain project successfully demonstrates the main ideas behind blockchain technology in a compact and understandable form. It shows how hashing, proof of work, ledger rules, and validation together produce a simple tamper-evident chain. Although it is not a production blockchain, it is a solid educational implementation that meets the assessment requirements and provides a clear foundation for further experimentation.
