@@ -137,3 +137,63 @@ func TestMiningMeetsDifficulty(t *testing.T) {
 		t.Fatal("mined block has an invalid Merkle root")
 	}
 }
+func TestConcurrentMiningMeetsDifficulty(t *testing.T) {
+	blk := NewBlock(
+		1,
+		[]transaction.Transaction{
+			{
+				From:   transaction.Faucet,
+				To:     "Alice",
+				Amount: 100,
+			},
+		},
+		NewGenesisBlock().Hash,
+	)
+
+	result := blk.MineConcurrent(2, 4)
+
+	if !MeetsDifficulty(result.Hash, 2) {
+		t.Fatalf(
+			"concurrent mining hash does not meet difficulty: %s",
+			result.Hash,
+		)
+	}
+
+	if blk.Nonce != result.Nonce {
+		t.Fatalf(
+			"expected block nonce %d, got %d",
+			result.Nonce,
+			blk.Nonce,
+		)
+	}
+
+	if blk.CalculateHash() != result.Hash {
+		t.Fatal("winning nonce does not reproduce the mined hash")
+	}
+
+	if result.HashesTried <= 0 {
+		t.Fatal("expected concurrent mining to attempt at least one hash")
+	}
+}
+func TestConcurrentMiningUsesDefaultWorkerCount(t *testing.T) {
+	blk := NewBlock(
+		1,
+		[]transaction.Transaction{
+			{
+				From:   transaction.Faucet,
+				To:     "Bob",
+				Amount: 50,
+			},
+		},
+		NewGenesisBlock().Hash,
+	)
+
+	result := blk.MineConcurrent(1, 0)
+
+	if !MeetsDifficulty(result.Hash, 1) {
+		t.Fatalf(
+			"hash does not meet difficulty: %s",
+			result.Hash,
+		)
+	}
+}
