@@ -1,12 +1,15 @@
 package block
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
-
 	"toy-blockchain/internal/transaction"
 	"toy-blockchain/merkle"
 )
@@ -28,6 +31,10 @@ type MineResult struct {
 	Hash           string `json:"hash"`
 	DurationMillis int64  `json:"duration_millis"`
 	HashesTried    int64  `json:"hashes_tried"`
+}
+type concurrentMineResult struct {
+	Nonce int
+	Hash  string
 }
 
 // hashInput contains only the values used to calculate the block hash.
@@ -76,13 +83,35 @@ func NewBlock(
 	}
 }
 
+// func (b Block) CalculateHash() string {
+// 	input := hashInput{
+// 		Height:     b.Height,
+// 		Timestamp:  b.Timestamp,
+// 		MerkleRoot: b.MerkleRoot,
+// 		PrevHash:   b.PrevHash,
+// 		Nonce:      b.Nonce,
+// 	}
+
+// 	bytes, err := json.Marshal(input)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+
+// 	sum := sha256.Sum256(bytes)
+// 	return hex.EncodeToString(sum[:])
+// }
+
 func (b Block) CalculateHash() string {
+	return b.calculateHashForNonce(b.Nonce)
+}
+
+func (b Block) calculateHashForNonce(nonce int) string {
 	input := hashInput{
 		Height:     b.Height,
 		Timestamp:  b.Timestamp,
 		MerkleRoot: b.MerkleRoot,
 		PrevHash:   b.PrevHash,
-		Nonce:      b.Nonce,
+		Nonce:      nonce,
 	}
 
 	bytes, err := json.Marshal(input)
@@ -98,7 +127,86 @@ func (b Block) CalculateHash() string {
 func (b Block) CalculateMerkleRoot() string {
 	return merkle.CalculateRoot(b.Transactions)
 }
+func (b *Block) MineConcurrent(difficulty int, workerCount int) MineResult {
+	start := time.Now()
 
+	// Make sure the block contains the correct transaction summary.
+	b.MerkleRoot = b.CalculateMerkleRoot()
+
+	// Use the available CPU count when no valid worker count is provided.
+	if workerCount <= 0 {
+		workerCount = runtime.NumCPU()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	resultChannel := make(chan concurrentMineResult, 1)
+
+	var waitGroup sync.WaitGroup
+	var hashesTried int64
+
+	// Copy the block so workers only read stable block information.
+	blockCopy := *b
+
+	for workerID := 0; workerID < workerCount; workerID++ {
+		waitGroup.Add(1)
+
+		go func(id int) {
+			defer waitGroup.Done()
+
+			// Each worker starts from a different nonce.
+			nonce := id
+
+			for {
+				// Stop when another worker has found a valid result.
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				atomic.AddInt64(&hashesTried, 1)
+
+				hash := blockCopy.calculateHashForNonce(nonce)
+
+				if MeetsDifficulty(hash, difficulty) {
+					// Only the first successful result is accepted.
+					select {
+					case resultChannel <- concurrentMineResult{
+						Nonce: nonce,
+						Hash:  hash,
+					}:
+						cancel()
+					case <-ctx.Done():
+					}
+
+					return
+				}
+
+				// Move to this worker's next nonce.
+				nonce += workerCount
+			}
+		}(workerID)
+	}
+
+	// Wait for the first valid result.
+	winner := <-resultChannel
+
+	// Make sure every worker stops before returning.
+	cancel()
+	waitGroup.Wait()
+
+	b.Nonce = winner.Nonce
+	b.Hash = winner.Hash
+
+	return MineResult{
+		Nonce:          winner.Nonce,
+		Hash:           winner.Hash,
+		DurationMillis: time.Since(start).Milliseconds(),
+		HashesTried:    atomic.LoadInt64(&hashesTried),
+	}
+}
 func (b *Block) Mine(difficulty int) MineResult {
 	start := time.Now()
 	var tries int64
