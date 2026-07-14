@@ -84,3 +84,39 @@ func TestNegativeAmountIsRejected(t *testing.T) {
 		t.Fatalf("expected negative amount to be rejected")
 	}
 }
+func TestValidationDetectsMerkleRootMismatch(t *testing.T) {
+	blockchain := NewBlockchain(1, 5)
+
+	err := blockchain.AddTransaction(transaction.Transaction{
+		From:   transaction.Faucet,
+		To:     "Alice",
+		Amount: 100,
+	})
+	if err != nil {
+		t.Fatalf("failed to add transaction: %v", err)
+	}
+
+	_, _, err = blockchain.MinePending()
+	if err != nil {
+		t.Fatalf("failed to mine block: %v", err)
+	}
+
+	// Deliberately change the mined transaction.
+	blockchain.Blocks[1].Transactions[0].Amount = 999
+
+	result := blockchain.Validate()
+
+	if result.Valid {
+		t.Fatal("expected tampered blockchain to be invalid")
+	}
+
+	expectedReason := "stored Merkle root does not match block transactions"
+
+	if result.Reason != expectedReason {
+		t.Fatalf(
+			"expected reason %q, got %q",
+			expectedReason,
+			result.Reason,
+		)
+	}
+}
