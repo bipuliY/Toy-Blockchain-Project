@@ -108,9 +108,28 @@ func (bc *Blockchain) Validate() ValidationResult {
 			return ValidationResult{Valid: false, BlockHeight: current.Height, Reason: fmt.Sprintf("invalid height: expected %d but found %d", i, current.Height)}
 		}
 
+		// calculatedHash := current.CalculateHash()
+		// if current.Hash != calculatedHash {
+		// 	return ValidationResult{Valid: false, BlockHeight: current.Height, Reason: "stored hash does not match recalculated hash"}
+		// }
+		calculatedMerkleRoot := current.CalculateMerkleRoot()
+
+		if current.MerkleRoot != calculatedMerkleRoot {
+			return ValidationResult{
+				Valid:       false,
+				BlockHeight: current.Height,
+				Reason:      "stored Merkle root does not match block transactions",
+			}
+		}
+
 		calculatedHash := current.CalculateHash()
+
 		if current.Hash != calculatedHash {
-			return ValidationResult{Valid: false, BlockHeight: current.Height, Reason: "stored hash does not match recalculated hash"}
+			return ValidationResult{
+				Valid:       false,
+				BlockHeight: current.Height,
+				Reason:      "stored hash does not match recalculated hash",
+			}
 		}
 
 		if i == 0 {

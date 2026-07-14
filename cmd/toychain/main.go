@@ -209,6 +209,7 @@ func printChain(bc *chain.Blockchain) {
 		fmt.Println("Height:", blk.Height)
 		fmt.Println("Timestamp:", blk.Timestamp)
 		fmt.Println("Previous hash:", blk.PrevHash)
+		fmt.Println("Merkle root:", blk.MerkleRoot)
 		fmt.Println("Nonce:", blk.Nonce)
 		fmt.Println("Hash:", blk.Hash)
 		fmt.Println("Transactions:")
