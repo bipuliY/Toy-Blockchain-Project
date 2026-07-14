@@ -1,252 +1,484 @@
-# Toy Blockchain CLI Project Report
+# Toy Blockchain and Ledger Simulator
 
-## Abstract
-
-This report documents a simplified blockchain implemented in Go as a command-line application. The project was built to meet the requirements of the assessment by demonstrating the core ideas behind a blockchain: deterministic hashing, proof-of-work mining, transaction validation, ledger balances, chain validation, and tamper detection. The implementation is intentionally small and educational, so it focuses on correctness and clarity rather than networking or production-grade consensus.
-
----
+## Research Report
 
 ## 1. Introduction
 
-The assignment required a single-process Go application that could create blocks, mine them with proof of work, store transactions, validate the chain, and report tampering. This project satisfies those requirements through a compact CLI that can be run locally from the terminal.
+This project is a small blockchain and ledger simulator developed in Go. It runs locally as a command-line application and does not communicate with external blockchain networks.
 
-The implementation is organised into separate packages for blocks, the chain, transactions, storage, and the CLI entry point. The chain is persisted to JSON so it can be reused between runs.
+The system supports transactions, account balances, a pending transaction pool, proof-of-work mining, JSON persistence, full-chain validation, and deliberate tampering for testing. As an additional stretch goal, a Merkle root was implemented to summarise the transactions contained in each block.
 
----
-
-## 2. Problem Statement
-
-Blockchain systems are often difficult to understand because they combine cryptography, distributed systems, and financial logic. The goal of this project was to simplify the core concepts so they could be studied in a small, understandable example. In particular, the project focuses on:
-
-- how transactions are created and checked,
-- how blocks are mined,
-- how each block is linked to the previous one,
-- how a chain can detect tampering, and
-- how account balances can be derived from confirmed transactions.
+The purpose of this report is to describe the hashing and validation design, present experiments conducted using the implementation, and discuss how the toy blockchain differs from a production blockchain.
 
 ---
 
-## 3. Project Objectives
+## 2. Implementation and Design
 
-The main objectives were to:
+### 2.1 Block structure
 
-1. implement a working toy blockchain in Go,
-2. create a CLI for common blockchain actions,
-3. add transactions to a pending pool,
-4. mine pending transactions into blocks,
-5. enforce proof-of-work difficulty,
-6. validate the integrity of the full chain,
-7. reject invalid or overspending transactions, and
-8. document the design choices and experimental results in a short report.
+Each block contains:
 
----
+1. Height
+2. Unix timestamp
+3. List of transactions
+4. Merkle root
+5. Previous block hash
+6. Nonce
+7. Block hash
 
-## 4. Scope of the Project
+The first block is a deterministic genesis block at height `0`. Its previous hash is a fixed string containing 64 zero characters.
 
-### Included in scope
+Each later block stores the hash of the block before it. This creates a link between consecutive blocks.
 
-- a single-process command-line application,
-- block and chain data structures,
-- deterministic SHA-256 hashing,
-- a genesis block,
-- a basic transaction and ledger model,
-- configurable proof-of-work mining,
-- full-chain validation and tamper detection,
-- unit tests, and
-- a written research report.
+### 2.2 Transaction model
 
-### Not included in scope
+A transaction contains:
 
-- peer-to-peer networking,
-- real wallets or digital signatures,
-- smart contracts,
-- a web interface, or
-- any external blockchain node or SDK.
+* sender,
+* recipient,
+* amount,
+* optional public key, and
+* optional digital signature.
 
----
+The ledger rejects transactions with:
 
-## 5. Implementation Summary
+* an empty sender,
+* an empty recipient,
+* a non-positive amount,
+* the same sender and recipient, or
+* an amount larger than the sender's available balance.
 
-The project uses the following main packages:
+A special sender named `FAUCET` is used to introduce initial funds. Faucet transactions credit the recipient without requiring an existing sender balance.
 
-- block: defines the block structure and hashing/mining logic,
-- chain: manages the blockchain, pending transactions, mining, validation, and balances,
-- internal/transaction: defines the transaction model and basic validation,
-- ledger: applies transactions to balances and checks whether a sender has enough funds,
-- storage: saves and loads the chain as JSON,
-- cmd/toychain: exposes the CLI commands.
+### 2.3 Pending transactions and block size
 
-A typical workflow is:
+New transactions are first stored in a pending transaction pool.
 
-1. initialise the chain,
-2. add one or more transactions,
-3. mine the pending transactions into a new block,
-4. view balances or the chain,
-5. validate the chain, and
-6. optionally tamper with an old block to observe validation failure.
+When mining begins, the application selects transactions from this pool up to the configured maximum block size. The selected transactions are copied into a new block and removed from the pending pool only after mining succeeds.
 
 ---
 
-## 6. Hashing Scheme and Why SHA-256 Was Used
+## 3. Hashing Scheme
 
-### 6.1 Hashing design
+### 3.1 Transaction hashing
 
-Each block uses SHA-256 to calculate a deterministic hash. The hash is computed from a stable serialisation of the block data using Go's standard library. The exact fields included in the hash input are:
+Each transaction is serialised using Go's `encoding/json` package and hashed using SHA-256.
 
-1. Height,
-2. Timestamp,
-3. Transactions,
-4. Previous hash,
-5. Nonce.
+Conceptually:
 
-The current block's own hash field is intentionally excluded. Including it would create a circular dependency because the hash is the value being calculated.
+```text
+Transaction hash = SHA-256(serialised transaction)
+```
 
-The transaction data is also serialized in a stable way. In the implementation, the transaction fields are stored in the order `From`, `To`, and `Amount`.
+The same transaction data produces the same transaction hash. Changing the sender, recipient, amount, public key, or signature changes the resulting hash.
 
-The hash input is therefore derived from a stable JSON structure rather than a manually formatted string. This makes the operation deterministic: the same block data will always produce the same hash.
+### 3.2 Merkle-root construction
 
-### 6.2 Why SHA-256 was chosen
+The hash of every transaction becomes a leaf in a Merkle tree.
 
-SHA-256 was selected because it is:
+For four transactions:
 
-- deterministic, so the same input always produces the same output,
-- fast enough for a toy blockchain on a laptop,
-- standardised and widely used in real blockchain systems,
-- easy to use with Go's `crypto/sha256` package.
+```text
+TX1 → Hash A
+TX2 → Hash B
+TX3 → Hash C
+TX4 → Hash D
+```
 
-For this project, SHA-256 is sufficient because the goal is to demonstrate how hashing links blocks together and makes tampering observable. It is not intended to be a production-grade security implementation.
+Adjacent hashes are joined and hashed:
+
+```text
+Hash AB = SHA-256(Hash A + Hash B)
+Hash CD = SHA-256(Hash C + Hash D)
+```
+
+The parent hashes are then joined and hashed again:
+
+```text
+Merkle root = SHA-256(Hash AB + Hash CD)
+```
+
+The resulting structure is:
+
+```text
+                    Merkle Root
+                         |
+                 -----------------
+                 |               |
+              Hash AB         Hash CD
+              /    \          /    \
+          Hash A  Hash B  Hash C  Hash D
+             |       |       |       |
+            TX1     TX2     TX3     TX4
+```
+
+When a level contains an odd number of hashes, the final hash is duplicated. For example:
+
+```text
+A, B, C
+```
+
+is processed as:
+
+```text
+A, B, C, C
+```
+
+The genesis block has no transactions. Its Merkle root is therefore the SHA-256 hash of an empty byte sequence:
+
+```text
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+```
+
+### 3.3 Block hashing
+
+The block hash is calculated from a stable JSON structure containing the following fields in this order:
+
+1. Height
+2. Timestamp
+3. Merkle root
+4. Previous hash
+5. Nonce
+
+Conceptually:
+
+```text
+Block hash = SHA-256(
+    height +
+    timestamp +
+    Merkle root +
+    previous hash +
+    nonce
+)
+```
+
+The raw transaction list is not directly included in the block-hash input. It is represented by the Merkle root.
+
+The block's own hash is excluded because including it would create a circular dependency.
+
+Go's standard `crypto/sha256` implementation was used because it is deterministic, widely standardised, available without external dependencies, and suitable for demonstrating blockchain hashing.
 
 ---
 
-## 7. Experiments and Results
+## 4. Proof-of-Work Mining
 
-### 7.1 Tamper-evidence experiment
+Mining searches for a nonce that causes the block hash to begin with the configured number of zero hexadecimal characters.
 
-One of the key experiments was to tamper with an existing transaction and then run validation.
+The process is:
 
-#### Procedure
+```text
+1. Start with nonce 0.
+2. Calculate the block hash.
+3. Check whether the hash begins with enough zeroes.
+4. If not, increase the nonce.
+5. Repeat until a valid hash is found.
+```
 
-1. Create a new chain.
-2. Add a faucet transaction and mine it.
-3. Validate the chain successfully.
-4. Tamper with the amount in the first mined block.
-5. Validate the chain again.
+For difficulty `2`, a valid result may look like:
 
-#### Observed output
+```text
+007143e8d37312ffd3d5942c0a96910f93c0f18b4d0fec5c29a855f2262090a6
+```
 
-Before tampering:
+Before mining starts, the Merkle root is recalculated from the block's transactions. Therefore, the proof of work is based on the correct transaction summary.
+
+---
+
+## 5. Full-Chain Validation
+
+Validation checks every block from the genesis block to the latest block.
+
+For each block, the application verifies:
+
+1. The height matches the block's position.
+2. The Merkle root matches the stored transactions.
+3. The stored block hash matches a recalculated hash.
+4. The previous-hash link is correct.
+5. Timestamps do not move backwards.
+6. The block hash satisfies the configured proof-of-work difficulty.
+7. Every transaction is valid.
+8. The sender has enough balance.
+9. A supplied digital signature is valid.
+
+The Merkle-root check is performed before the block-hash check:
+
+```text
+Transactions
+     ↓
+Recalculate Merkle root
+     ↓
+Compare with stored Merkle root
+     ↓
+Recalculate block hash
+     ↓
+Compare with stored block hash
+```
+
+This is necessary because the block hash contains the stored Merkle root rather than the raw transactions.
+
+---
+
+## 6. Investigation 1: Tamper Evidence
+
+### 6.1 Objective
+
+The objective was to determine whether changing a transaction inside an already-mined block would be detected during validation.
+
+### 6.2 Procedure
+
+A new chain was created and two transactions were added:
+
+```bash
+rm data/chain.json
+go run ./cmd/toychain init -difficulty 2
+go run ./cmd/toychain add -from FAUCET -to Alice -amount 100
+go run ./cmd/toychain add -from FAUCET -to Bob -amount 50
+go run ./cmd/toychain mine
+```
+
+The honest chain was then validated:
 
 ```text
 $ go run ./cmd/toychain validate
 Chain valid
 ```
 
-After tampering:
+The first transaction in block `1` was changed from `100` to `999`:
 
 ```text
 $ go run ./cmd/toychain tamper -block 1 -tx 0 -amount 999
+
 Tampered block 1 transaction 0 amount: 100 -> 999
 Important: hash was not recalculated, so validation should fail now.
+```
 
+Validation was run again:
+
+```text
 $ go run ./cmd/toychain validate
+
 Chain invalid
 First offending block: 1
-Reason: stored hash does not match recalculated hash
+Reason: stored Merkle root does not match block transactions
 ```
 
-#### Interpretation
+### 6.3 Explanation
 
-The chain becomes invalid because the stored hash of block 1 no longer matches the hash recomputed from the altered data. Validation detects this immediately and identifies the first offending block. This shows that even a small change in an early block breaks the chain's integrity.
-
-### 7.2 Difficulty versus mining effort
-
-The mining step uses proof of work by searching for a nonce such that the block hash begins with the required number of leading zero hex digits. Higher difficulty means more hashes must be tried before success.
-
-The following results were observed on this machine:
-
-| Difficulty | Hashes tried | Approx. time |
-| --- | ---: | ---: |
-| 4 | 119,724 | 0.08 s |
-| 5 | 371,601 | 0.16 s |
-| 6 | 44,060,072 | 14.77 s |
-
-The trend is not linear. For a difficulty target of $d$ leading zero hex digits, the expected work grows roughly like $16^d$ because each extra zero makes the target much smaller. This is why the mining time rises quickly as difficulty increases.
-
----
-
-## 8. Ledger Behaviour and Example Balances
-
-The ledger model is intentionally simple. A normal transaction subtracts the amount from the sender and adds it to the recipient. A faucet transaction is treated as a special case that credits the recipient directly without requiring an existing balance.
-
-Example:
-
-```bash
-go run ./cmd/toychain init -difficulty 2
-go run ./cmd/toychain add -from FAUCET -to Alice -amount 100
-go run ./cmd/toychain mine
-go run ./cmd/toychain add -from Alice -to Bob -amount 30
-go run ./cmd/toychain mine
-go run ./cmd/toychain balances
-```
-
-Observed output:
+Before tampering, the Merkle root represented:
 
 ```text
-Balances
-Alice: 70
-Bob: 30
+FAUCET → Alice : 100
+FAUCET → Bob   : 50
 ```
 
-This example also shows that overspending is rejected. For instance:
-
-```bash
-go run ./cmd/toychain add -from Alice -to Bob -amount 150
-```
-
-The command fails with:
+After tampering, the first transaction became:
 
 ```text
-Error: insufficient balance: Alice has 100 but tried to send 150
+FAUCET → Alice : 999
 ```
 
----
+This changed the serialised transaction data and therefore changed its SHA-256 transaction hash. Because one leaf hash changed, the calculated Merkle root also changed.
 
-## 9. Discussion Questions
+However, the Merkle root stored in the block remained the original value.
 
-### How does the previous-hash link help security?
+Therefore:
 
-Each block stores the hash of the previous block. If an old block is modified, the hash of that block changes and the next block's stored previous-hash value no longer matches. This makes tampering visible, especially when validation checks the whole chain.
+```text
+Stored Merkle root ≠ Recalculated Merkle root
+```
 
-### What is an alternative to proof-of-work?
+The Merkle-root validation check detected the modification and identified block `1` as the first offending block.
 
-Proof-of-stake is one alternative. It lets a participant create the next block based on the amount of stake they hold rather than on solving a computational puzzle. A benefit is lower energy consumption, while a drawback is that wealth can influence block production more heavily.
+### 6.4 Result
 
-### How does this toy chain differ from a production blockchain?
+The experiment confirmed that changing even one transaction makes the chain invalid.
 
-Three concrete differences are:
-
-1. there is no network of peers or consensus among nodes,
-2. there are no transaction signatures or real wallet authentication,
-3. there is no Merkle tree or full economic finality model.
-
-A natural improvement would be to add digital signatures so that transactions can be verified by public/private keys rather than by a simple local ledger.
+The automated test `TestValidationDetectsMerkleRootMismatch` also passed, proving that the behaviour is checked whenever the Go test suite runs.
 
 ---
 
-## 10. Limitations and Future Improvements
+## 7. Investigation 2: Difficulty Versus Mining Effort
 
-The project is intentionally educational and therefore has several limitations:
+### 7.1 Objective
 
-- it does not support a distributed network,
-- it does not provide real cryptographic signatures,
-- it does not implement Merkle trees,
-- it uses a simple local JSON persistence model, and
-- it does not support forks or chain selection rules.
+The objective was to observe how increasing proof-of-work difficulty affects:
 
-Future work could focus on digital signatures, Merkle roots, improved validation messages, and a richer CLI.
+* the number of hashes attempted, and
+* the mining time.
+
+### 7.2 Results
+
+The following results were obtained during mining experiments:
+
+| Difficulty | Hashes tried | Approximate time |
+| ---------: | -----------: | ---------------: |
+|          4 |      119,724 |     0.08 seconds |
+|          5 |      371,601 |     0.16 seconds |
+|          6 |   44,060,072 |    14.77 seconds |
+
+### 7.3 Interpretation
+
+The mining effort does not grow linearly.
+
+Each hexadecimal character has 16 possible values:
+
+```text
+0, 1, 2, ..., 9, a, b, c, d, e, f
+```
+
+The approximate probability that one hash begins with one required zero is:
+
+```text
+1/16
+```
+
+For two required zeroes, it is:
+
+```text
+1/16²
+```
+
+For a difficulty of `d`, the expected work grows approximately as:
+
+```text
+16^d
+```
+
+Therefore, adding one more required zero can make the expected search approximately 16 times harder.
+
+Actual results vary because mining is probabilistic. A valid nonce may sometimes be found quickly, while another block at the same difficulty may require many more attempts.
+
+The large increase at difficulty `6` demonstrates this probabilistic and faster-than-linear growth.
+
+---
+
+## 8. Discussion Questions
+
+### 8.1 How does the previous-hash link make old-block tampering impractical in a real chain?
+
+Each block stores the hash of the block before it.
+
+If an old block is changed, its Merkle root and block hash must also change. The following block still contains the original hash as its `previous hash`, so the link becomes invalid.
+
+To hide the modification, an attacker would need to:
+
+1. recalculate the modified block,
+2. redo its proof of work,
+3. update and re-mine every following block, and
+4. catch up with and surpass the valid chain maintained by the network.
+
+In this local toy blockchain, tampering is easy because there is only one local JSON file and no competing nodes. In a production proof-of-work blockchain, honest nodes continue extending the valid chain while the attacker tries to recreate the old work. This makes rewriting a sufficiently deep block computationally difficult. This principle is described in the Bitcoin white paper's proof-of-work discussion.
+
+### 8.2 What is an alternative to proof of work?
+
+One alternative is **proof of stake**.
+
+In proof of stake, validators are selected partly according to cryptocurrency they lock as stake rather than by repeatedly calculating hashes.
+
+One advantage is that it normally requires much less computational work and energy than proof of work.
+
+One drawback is that participants with larger stakes may have greater influence. The system must also include rules for penalising dishonest validators and handling validator selection fairly.
+
+### 8.3 Three differences from a production blockchain
+
+This toy blockchain differs from a production blockchain in several ways:
+
+1. It has no peer-to-peer network or distributed consensus.
+2. Legacy unsigned transactions are accepted.
+3. It does not support Merkle proofs for individual transactions.
+4. It stores the complete chain in one local JSON file.
+5. It has no mining rewards or transaction fees.
+6. It has no fork-resolution or finality rules.
+7. It does not provide secure wallet or private-key management.
+
+### 8.4 Improvement sketch: Merkle proofs
+
+The project now calculates a Merkle root, but it does not generate Merkle proofs.
+
+A Merkle proof allows a transaction to be checked without downloading or hashing every transaction in the block.
+
+To add this feature, the implementation could:
+
+1. store or reconstruct each level of the Merkle tree,
+2. locate the requested transaction's leaf hash,
+3. collect the neighbouring hash at each level,
+4. return these hashes as the proof, and
+5. reconstruct the root using the transaction and proof.
+
+The reconstructed root would then be compared with the Merkle root stored in the block.
+
+This would make it possible to prove that a transaction belongs to a block using only a small number of hashes.
+
+---
+
+## 9. Testing and Reproducibility
+
+The source code was formatted using:
+
+```bash
+gofmt -w .
+```
+
+The complete test suite was run using:
+
+```bash
+go test ./...
+```
+
+The tests passed for the block, chain, Merkle, and storage packages.
+
+Detailed chain tests included:
+
+```text
+TestHonestChainValidates
+TestTamperingIsDetected
+TestOverspendingTransactionIsRejected
+TestNegativeAmountIsRejected
+TestValidationDetectsMerkleRootMismatch
+```
+
+The project can be reproduced from a fresh clone using the build and run commands documented in `README.md`.
+
+---
+
+## 10. Limitations and Engineering Decisions
+
+The project was intentionally kept small and understandable.
+
+Important limitations include:
+
+* no distributed network,
+* no consensus between independent peers,
+* no fork handling,
+* no transaction fees,
+* no mining rewards,
+* no Merkle proofs,
+* optional rather than compulsory signatures,
+* local JSON persistence, and
+* no production-grade key management.
+
+The standard library was preferred throughout the implementation. SHA-256, JSON encoding, Ed25519 signing, file operations, and timing were implemented using Go standard-library packages.
+
+The Merkle root and optional signatures were treated as stretch improvements only after the main blockchain, ledger, mining, validation, persistence, and tests were working.
 
 ---
 
 ## 11. Conclusion
 
-The toy blockchain project successfully demonstrates the main ideas behind blockchain technology in a compact and understandable form. It shows how hashing, proof of work, ledger rules, and validation together produce a simple tamper-evident chain. Although it is not a production blockchain, it is a solid educational implementation that meets the assessment requirements and provides a clear foundation for further experimentation.
+The project successfully demonstrates the required blockchain and ledger concepts in a compact Go command-line application.
+
+The tampering investigation showed that modifying a transaction changes its transaction hash and the recalculated Merkle root. Validation correctly detected the mismatch and identified the first offending block.
+
+The mining investigation showed that difficulty and mining effort do not have a linear relationship. Requiring additional leading hexadecimal zeroes reduces the probability of success and causes expected work to grow approximately as `16^d`.
+
+The Merkle-root stretch goal improved the original design by replacing the raw transaction list in the block-hash input with one deterministic transaction summary. Together with proof-of-work, previous-hash linking, ledger validation, and automated tests, this creates a clear educational example of a tamper-evident blockchain.
+
+---
+
+## References
+
+1. Satoshi Nakamoto, *Bitcoin: A Peer-to-Peer Electronic Cash System*, 2008.
+2. Go Documentation, *crypto/sha256 Package*.
+3. Go Documentation, *encoding/json Package*.
+4. Go Documentation, *crypto/ed25519 Package*.
+5. Ethereum.org, *Proof-of-Stake Documentation*.
