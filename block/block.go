@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"toy-blockchain/internal/transaction"
+	"toy-blockchain/merkle"
 )
 
 const GenesisPrevHash = "0000000000000000000000000000000000000000000000000000000000000000"
@@ -16,6 +17,7 @@ type Block struct {
 	Height       int                       `json:"height"`
 	Timestamp    int64                     `json:"timestamp"`
 	Transactions []transaction.Transaction `json:"transactions"`
+	MerkleRoot   string                    `json:"merkle_root"`
 	PrevHash     string                    `json:"prev_hash"`
 	Nonce        int                       `json:"nonce"`
 	Hash         string                    `json:"hash"`
@@ -28,19 +30,26 @@ type MineResult struct {
 	HashesTried    int64  `json:"hashes_tried"`
 }
 
+// hashInput contains only the values used to calculate the block hash.
+//
+// The raw transaction list is no longer included.
+// MerkleRoot represents all transactions in the block.
 type hashInput struct {
-	Height       int                       `json:"height"`
-	Timestamp    int64                     `json:"timestamp"`
-	Transactions []transaction.Transaction `json:"transactions"`
-	PrevHash     string                    `json:"prev_hash"`
-	Nonce        int                       `json:"nonce"`
+	Height     int    `json:"height"`
+	Timestamp  int64  `json:"timestamp"`
+	MerkleRoot string `json:"merkle_root"`
+	PrevHash   string `json:"prev_hash"`
+	Nonce      int    `json:"nonce"`
 }
 
 func NewGenesisBlock() Block {
+	transactions := []transaction.Transaction{}
+
 	genesis := Block{
 		Height:       0,
 		Timestamp:    0,
-		Transactions: []transaction.Transaction{},
+		Transactions: transactions,
+		MerkleRoot:   merkle.CalculateRoot(transactions),
 		PrevHash:     GenesisPrevHash,
 		Nonce:        0,
 	}
@@ -49,11 +58,19 @@ func NewGenesisBlock() Block {
 	return genesis
 }
 
-func NewBlock(height int, transactions []transaction.Transaction, prevHash string) Block {
+func NewBlock(
+	height int,
+	transactions []transaction.Transaction,
+	prevHash string,
+) Block {
+	// Copy transactions so that the block owns its own transaction slice.
+	transactionCopy := append([]transaction.Transaction(nil), transactions...)
+
 	return Block{
 		Height:       height,
 		Timestamp:    time.Now().Unix(),
-		Transactions: transactions,
+		Transactions: transactionCopy,
+		MerkleRoot:   merkle.CalculateRoot(transactionCopy),
 		PrevHash:     prevHash,
 		Nonce:        0,
 	}
@@ -61,11 +78,11 @@ func NewBlock(height int, transactions []transaction.Transaction, prevHash strin
 
 func (b Block) CalculateHash() string {
 	input := hashInput{
-		Height:       b.Height,
-		Timestamp:    b.Timestamp,
-		Transactions: b.Transactions,
-		PrevHash:     b.PrevHash,
-		Nonce:        b.Nonce,
+		Height:     b.Height,
+		Timestamp:  b.Timestamp,
+		MerkleRoot: b.MerkleRoot,
+		PrevHash:   b.PrevHash,
+		Nonce:      b.Nonce,
 	}
 
 	bytes, err := json.Marshal(input)
@@ -77,16 +94,26 @@ func (b Block) CalculateHash() string {
 	return hex.EncodeToString(sum[:])
 }
 
+// CalculateMerkleRoot recalculates the root from the block's transactions.
+func (b Block) CalculateMerkleRoot() string {
+	return merkle.CalculateRoot(b.Transactions)
+}
+
 func (b *Block) Mine(difficulty int) MineResult {
 	start := time.Now()
 	var tries int64
 
+	// Always calculate the root before mining.
+	b.MerkleRoot = b.CalculateMerkleRoot()
+
 	for {
 		tries++
+
 		hash := b.CalculateHash()
 
 		if MeetsDifficulty(hash, difficulty) {
 			b.Hash = hash
+
 			return MineResult{
 				Nonce:          b.Nonce,
 				Hash:           hash,
