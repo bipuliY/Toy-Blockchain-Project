@@ -415,6 +415,7 @@ func (bc *Blockchain) Validate() ValidationResult {
 		Reason:      "chain is valid",
 	}
 }
+
 // func (bc *Blockchain) Validate() ValidationResult {
 // 	if len(bc.Blocks) == 0 {
 // 		return ValidationResult{Valid: false, BlockHeight: -1, Reason: "chain has no blocks"}

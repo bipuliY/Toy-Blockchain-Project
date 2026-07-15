@@ -223,7 +223,7 @@ func (b *Block) Mine(difficulty int) MineResult {
 
 	// Always calculate the root before mining.
 	b.MerkleRoot = b.CalculateMerkleRoot()
-	
+
 	if difficulty < 1 {
 		difficulty = 1
 	}
