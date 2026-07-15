@@ -13,10 +13,10 @@ const (
 	DefaultDifficulty = 2
 	DefaultBlockSize  = 5
 
-	DefaultTargetBlockTimeSeconds       = 10
-	DefaultRetargetInterval             = 5
-	DefaultMinDifficulty                = 1
-	DefaultMaxDifficulty                = 6
+	DefaultTargetBlockTimeSeconds = 10
+	DefaultRetargetInterval       = 5
+	DefaultMinDifficulty          = 1
+	DefaultMaxDifficulty          = 6
 )
 
 type Blockchain struct {
@@ -251,6 +251,13 @@ func (bc *Blockchain) Validate() ValidationResult {
 			Reason:      "retarget interval must be at least 2",
 		}
 	}
+	if bc.BlockSize <= 0 {
+		return ValidationResult{
+			Valid:       false,
+			BlockHeight: -1,
+			Reason:      "block size must be positive",
+		}
+	}
 
 	if bc.MinDifficulty <= 0 ||
 		bc.MaxDifficulty < bc.MinDifficulty {
@@ -289,6 +296,17 @@ func (bc *Blockchain) Validate() ValidationResult {
 					"invalid height: expected %d but found %d",
 					i,
 					current.Height,
+				),
+			}
+		}
+		if i > 0 && len(current.Transactions) > bc.BlockSize {
+			return ValidationResult{
+				Valid:       false,
+				BlockHeight: current.Height,
+				Reason: fmt.Sprintf(
+					"block contains %d transactions but block size is %d",
+					len(current.Transactions),
+					bc.BlockSize,
 				),
 			}
 		}
