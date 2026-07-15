@@ -105,6 +105,23 @@ func runInit(args []string) error {
 	fmt.Println("New blockchain created")
 	fmt.Println("File:", opts.file)
 	fmt.Println("Difficulty:", bc.Difficulty)
+	fmt.Println(
+		"Target block time:",
+		bc.TargetBlockTimeSeconds,
+		"seconds",
+	)
+
+	fmt.Println(
+		"Retarget interval:",
+		bc.RetargetInterval,
+		"blocks",
+	)
+
+	fmt.Printf(
+		"Difficulty range: %d-%d\n",
+		bc.MinDifficulty,
+		bc.MaxDifficulty,
+	)
 	fmt.Println("Block size:", bc.BlockSize)
 	fmt.Println("Genesis hash:", bc.Blocks[0].Hash)
 	return nil
@@ -172,10 +189,23 @@ func runMine(args []string) error {
 
 	fmt.Println("Block mined successfully")
 	fmt.Println("Height:", newBlock.Height)
+	fmt.Println("Block difficulty:", newBlock.Difficulty)
 	fmt.Println("Nonce:", result.Nonce)
 	fmt.Println("Hash:", result.Hash)
 	fmt.Println("Hashes tried:", result.HashesTried)
 	fmt.Println("Time taken:", result.DurationMillis, "ms")
+	if bc.Difficulty != newBlock.Difficulty {
+		fmt.Printf(
+			"Difficulty retargeted: %d -> %d\n",
+			newBlock.Difficulty,
+			bc.Difficulty,
+		)
+	} else {
+		fmt.Println(
+			"Next block difficulty:",
+			bc.Difficulty,
+		)
+	}
 	fmt.Println("Remaining pending transactions:", len(bc.PendingTransactions))
 	return nil
 }
@@ -199,7 +229,23 @@ func runPrint(args []string) error {
 func printChain(bc *chain.Blockchain) {
 	fmt.Println("--------Toy Blockchain CLI Project------")
 	fmt.Println("Blockchain")
-	fmt.Println("Difficulty:", bc.Difficulty)
+	// fmt.Println("Difficulty:", bc.Difficulty)
+	fmt.Println(
+		"Next block difficulty:",
+		bc.Difficulty,
+	)
+
+	fmt.Println(
+		"Target block time:",
+		bc.TargetBlockTimeSeconds,
+		"seconds",
+	)
+
+	fmt.Println(
+		"Retarget interval:",
+		bc.RetargetInterval,
+		"blocks",
+	)
 	fmt.Println("Block size:", bc.BlockSize)
 	fmt.Println("Blocks:", len(bc.Blocks))
 	fmt.Println()
@@ -210,6 +256,7 @@ func printChain(bc *chain.Blockchain) {
 		fmt.Println("Timestamp:", blk.Timestamp)
 		fmt.Println("Previous hash:", blk.PrevHash)
 		fmt.Println("Merkle root:", blk.MerkleRoot)
+		fmt.Println("Difficulty:", blk.Difficulty)
 		fmt.Println("Nonce:", blk.Nonce)
 		fmt.Println("Hash:", blk.Hash)
 		fmt.Println("Transactions:")

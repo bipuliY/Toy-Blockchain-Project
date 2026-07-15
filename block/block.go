@@ -22,6 +22,7 @@ type Block struct {
 	Transactions []transaction.Transaction `json:"transactions"`
 	MerkleRoot   string                    `json:"merkle_root"`
 	PrevHash     string                    `json:"prev_hash"`
+	Difficulty   int                       `json:"difficulty"`
 	Nonce        int                       `json:"nonce"`
 	Hash         string                    `json:"hash"`
 }
@@ -46,6 +47,7 @@ type hashInput struct {
 	Timestamp  int64  `json:"timestamp"`
 	MerkleRoot string `json:"merkle_root"`
 	PrevHash   string `json:"prev_hash"`
+	Difficulty int    `json:"difficulty"`
 	Nonce      int    `json:"nonce"`
 }
 
@@ -58,6 +60,7 @@ func NewGenesisBlock() Block {
 		Transactions: transactions,
 		MerkleRoot:   merkle.CalculateRoot(transactions),
 		PrevHash:     GenesisPrevHash,
+		Difficulty:   0,
 		Nonce:        0,
 	}
 
@@ -111,6 +114,7 @@ func (b Block) calculateHashForNonce(nonce int) string {
 		Timestamp:  b.Timestamp,
 		MerkleRoot: b.MerkleRoot,
 		PrevHash:   b.PrevHash,
+		Difficulty: b.Difficulty,
 		Nonce:      nonce,
 	}
 
@@ -132,6 +136,12 @@ func (b *Block) MineConcurrent(difficulty int, workerCount int) MineResult {
 
 	// Make sure the block contains the correct transaction summary.
 	b.MerkleRoot = b.CalculateMerkleRoot()
+
+	if difficulty < 1 {
+		difficulty = 1
+	}
+
+	b.Difficulty = difficulty
 
 	// Use the available CPU count when no valid worker count is provided.
 	if workerCount <= 0 {
@@ -213,6 +223,12 @@ func (b *Block) Mine(difficulty int) MineResult {
 
 	// Always calculate the root before mining.
 	b.MerkleRoot = b.CalculateMerkleRoot()
+
+	if difficulty < 1 {
+		difficulty = 1
+	}
+
+	b.Difficulty = difficulty
 
 	for {
 		tries++
