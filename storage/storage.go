@@ -28,6 +28,25 @@ func Load(path string) (*chain.Blockchain, error) {
 		bc.Difficulty = chain.DefaultDifficulty
 	}
 
+	if bc.TargetBlockTimeSeconds <= 0 {
+		bc.TargetBlockTimeSeconds =
+			chain.DefaultTargetBlockTimeSeconds
+	}
+
+	if bc.RetargetInterval < 2 {
+		bc.RetargetInterval =
+			chain.DefaultRetargetInterval
+	}
+
+	if bc.MinDifficulty <= 0 {
+		bc.MinDifficulty =
+			chain.DefaultMinDifficulty
+	}
+
+	if bc.MaxDifficulty < bc.MinDifficulty {
+		bc.MaxDifficulty =
+			chain.DefaultMaxDifficulty
+	}
 	return &bc, nil
 }
 
