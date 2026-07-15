@@ -74,7 +74,8 @@ func (bc *Blockchain) MinePending() (block.Block, block.MineResult, error) {
 	previousBlock := bc.Blocks[len(bc.Blocks)-1]
 
 	newBlock := block.NewBlock(len(bc.Blocks), txsToMine, previousBlock.Hash)
-	mineResult := newBlock.Mine(bc.Difficulty)
+	//mineResult := newBlock.Mine(bc.Difficulty)
+	mineResult := newBlock.MineConcurrent(bc.Difficulty, 0)
 
 	bc.Blocks = append(bc.Blocks, newBlock)
 	bc.PendingTransactions = bc.PendingTransactions[txCount:]

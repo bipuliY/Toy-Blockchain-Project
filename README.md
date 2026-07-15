@@ -169,3 +169,25 @@ go test ./...
 ## Limitations
 
 This is a learning-oriented toy blockchain and is not intended for production use. It does not provide peer-to-peer networking, full consensus among nodes, Merkle proofs for individual transactions, or a complete wallet and security model.
+
+## Run the project - example
+
+rm data/chain.json
+
+go run ./cmd/toychain init -difficulty 2
+
+go run ./cmd/toychain add -from FAUCET -to Alice -amount 100
+
+go run ./cmd/toychain add -from FAUCET -to Bob -amount 50
+
+go run ./cmd/toychain pending
+
+go run ./cmd/toychain mine
+
+go run ./cmd/toychain print
+
+go run ./cmd/toychain validate
+
+go run ./cmd/toychain tamper -block 1 -tx 0 -amount 999
+
+go run ./cmd/toychain validate
