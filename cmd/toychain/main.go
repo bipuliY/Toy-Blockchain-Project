@@ -599,5 +599,5 @@ func printUsage() {
 	fmt.Println("  go run ./cmd/toychain mine")
 	fmt.Println("  go run ./cmd/toychain balances")
 	fmt.Println("  go run ./cmd/toychain validate")
-	fmt.Println("  go run ./cmd/toychain resolve -file data/nodeA.json -candidates data/nodeB.json,data/nodeC.json",)
+	fmt.Println("  go run ./cmd/toychain resolve -file data/nodeA.json -candidates data/nodeB.json,data/nodeC.json")
 }

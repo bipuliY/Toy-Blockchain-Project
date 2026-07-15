@@ -289,4 +289,4 @@ func restoreLocalPending(
 	}
 
 	return retained, dropped
-} 
+}
