@@ -13,7 +13,7 @@ const (
 	DefaultDifficulty = 2
 	DefaultBlockSize  = 5
 
-	DefaultTargetBlockTimeSeconds int64 = 10
+	DefaultTargetBlockTimeSeconds       = 10
 	DefaultRetargetInterval             = 5
 	DefaultMinDifficulty                = 1
 	DefaultMaxDifficulty                = 6
