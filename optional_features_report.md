@@ -16,7 +16,7 @@ These features improve transaction authenticity, block integrity, mining perform
 ## 2. Feature Completion Summary
 
 | Optional Feature | Status | Main Implementation Files |
-| --- | --- | --- |
+| ---              | ---    | ---                       |
 | Digital signatures | Implemented | `internal/transaction/transaction.go`, `cmd/toychain/main.go`, `ledger/ledger.go` |
 | Merkle root | Implemented | `merkle/merkle.go`, `block/block.go`, `chain/chain.go` |
 | Concurrent mining | Implemented | `block/block.go`, `chain/chain.go` |
