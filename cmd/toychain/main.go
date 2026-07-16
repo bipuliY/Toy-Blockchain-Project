@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"toy-blockchain/chain"
 	"toy-blockchain/internal/transaction"
@@ -48,6 +49,8 @@ func main() {
 		err = runPrint(args)
 	case "validate":
 		err = runValidate(args)
+	case "resolve":
+		err = runResolve(args)
 	case "balances":
 		err = runBalances(args)
 	case "pending":
@@ -297,7 +300,150 @@ func runValidate(args []string) error {
 	fmt.Println("Reason:", result.Reason)
 	return nil
 }
+func runResolve(args []string) error {
+	fs := flag.NewFlagSet(
+		"resolve",
+		flag.ExitOnError,
+	)
 
+	opts := addCommonFlags(fs)
+
+	candidateList := fs.String(
+		"candidates",
+		"",
+		"comma-separated candidate blockchain JSON files",
+	)
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(*candidateList) == "" {
+		return fmt.Errorf(
+			"at least one candidate file is required",
+		)
+	}
+
+	localChain, err := loadExisting(opts)
+	if err != nil {
+		return err
+	}
+
+	candidatePaths := make([]string, 0)
+
+	for _, rawPath := range strings.Split(
+		*candidateList,
+		",",
+	) {
+		path := strings.TrimSpace(rawPath)
+
+		if path != "" {
+			candidatePaths = append(
+				candidatePaths,
+				path,
+			)
+		}
+	}
+
+	if len(candidatePaths) == 0 {
+		return fmt.Errorf(
+			"at least one candidate file is required",
+		)
+	}
+
+	candidates := make(
+		[]*chain.Blockchain,
+		0,
+		len(candidatePaths),
+	)
+
+	loadedPaths := make(
+		[]string,
+		0,
+		len(candidatePaths),
+	)
+
+	for _, path := range candidatePaths {
+		candidate, loadError :=
+			storage.Load(path)
+
+		if loadError != nil {
+			fmt.Printf(
+				"Candidate %s rejected: could not load: %v\n",
+				path,
+				loadError,
+			)
+
+			continue
+		}
+
+		candidates = append(
+			candidates,
+			candidate,
+		)
+
+		loadedPaths = append(
+			loadedPaths,
+			path,
+		)
+	}
+
+	if len(candidates) == 0 {
+		return fmt.Errorf(
+			"none of the candidate files could be loaded",
+		)
+	}
+
+	result := localChain.ResolveFork(candidates)
+
+	for index, evaluation := range result.Candidates {
+		status := "rejected"
+
+		if evaluation.Valid {
+			status = "valid"
+		}
+
+		if evaluation.Selected {
+			status = "selected"
+		}
+
+		fmt.Printf(
+			"Candidate %s: %s - %s (blocks: %d)\n",
+			loadedPaths[index],
+			status,
+			evaluation.Reason,
+			evaluation.Length,
+		)
+	}
+
+	if result.Replaced {
+		if err := storage.Save(
+			opts.file,
+			localChain,
+		); err != nil {
+			return err
+		}
+	}
+
+	fmt.Println(
+		"Fork resolution:",
+		result.Reason,
+	)
+
+	fmt.Printf(
+		"Local chain length: %d -> %d\n",
+		result.PreviousLength,
+		result.SelectedLength,
+	)
+
+	fmt.Printf(
+		"Pending retained: %d, dropped: %d\n",
+		result.RetainedPending,
+		result.DroppedPending,
+	)
+
+	return nil
+}
 func runBalances(args []string) error {
 	fs := flag.NewFlagSet("balances", flag.ExitOnError)
 	opts := addCommonFlags(fs)
@@ -439,6 +585,7 @@ func printUsage() {
 	fmt.Println("  mine       Mine pending transactions into a new block")
 	fmt.Println("  print      Print the blockchain")
 	fmt.Println("  validate   Validate the blockchain")
+	fmt.Println("  resolve    Resolve competing blockchain chains")
 	fmt.Println("  balances   Show account balances")
 	fmt.Println("  pending    Show pending transactions")
 	fmt.Println("  tamper     Deliberately modify old data for research experiment")
@@ -452,4 +599,5 @@ func printUsage() {
 	fmt.Println("  go run ./cmd/toychain mine")
 	fmt.Println("  go run ./cmd/toychain balances")
 	fmt.Println("  go run ./cmd/toychain validate")
+	fmt.Println("  go run ./cmd/toychain resolve -file data/nodeA.json -candidates data/nodeB.json,data/nodeC.json")
 }
