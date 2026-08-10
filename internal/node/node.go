@@ -18,9 +18,9 @@ import (
 //
 // For now it only owns the blockchain and basic network configuration.
 type Node struct {
-	mu sync.RWMutex  //protect shared state 
+	mu sync.RWMutex //protect shared state
 
-	blockchain *chain.Blockchain
+	blockchain *chain.Blockchain // the node's copy of the blockchain
 	address    string
 	peers      map[string]struct{}
 }
