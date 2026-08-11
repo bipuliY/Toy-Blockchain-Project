@@ -3,7 +3,7 @@ package api_test
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
+	"net/http/httptest" //this let us test HTTP handler without actually starting port 8001
 	"testing"
 
 	"toy-blockchain/chain"
