@@ -25,6 +25,14 @@ type Node struct {
 	peers      map[string]struct{}
 }
 
+// Status represents a read-only snapshot of the node.
+type Status struct {
+	Address   string `json:"address"`
+	Height    int    `json:"height"`
+	HeadHash  string `json:"head_hash"`
+	PeerCount int    `json:"peer_count"`
+}
+
 // New creates a new blockchain node.
 //
 // address is the HTTP address this node will eventually listen on.
@@ -102,4 +110,25 @@ func (n *Node) Peers() []string {
 	}
 
 	return peers
+}
+
+// Status returns a consistent snapshot of the node's current state.
+func (n *Node) Status() Status {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	height := -1
+	headHash := ""
+
+	if len(n.blockchain.Blocks) > 0 {
+		height = len(n.blockchain.Blocks) - 1
+		headHash = n.blockchain.Blocks[len(n.blockchain.Blocks)-1].Hash
+	}
+
+	return Status{
+		Address:   n.address,
+		Height:    height,
+		HeadHash:  headHash,
+		PeerCount: len(n.peers),
+	}
 }
