@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"toy-blockchain/chain"
 	"toy-blockchain/internal/api"
+	"toy-blockchain/internal/network"
 	"toy-blockchain/internal/node"
 )
 
@@ -35,6 +37,30 @@ func main() {
 		chain.DefaultDifficulty,
 		chain.DefaultBlockSize,
 	)
+	peerClient := network.NewClient()
+
+	// Fetch status from each peer and log the results - contact configured peers
+	for _, peer := range n.Peers() {
+		status, err := peerClient.FetchStatus(
+			context.Background(),
+			peer,
+		)
+		if err != nil {
+			log.Printf(
+				"could not contact peer=%s error=%v",
+				peer,
+				err,
+			)
+			continue
+		}
+
+		log.Printf(
+			"peer connected peer=%s height=%d head=%s",
+			peer,
+			status.Height,
+			status.HeadHash,
+		)
+	}
 
 	apiServer := api.NewServer(n)
 
