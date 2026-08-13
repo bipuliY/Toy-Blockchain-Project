@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"toy-blockchain/chain"
+	"toy-blockchain/internal/transaction"
 )
 
 // Node represents one running blockchain node.
@@ -131,4 +132,27 @@ func (n *Node) Status() Status {
 		HeadHash:  headHash,
 		PeerCount: len(n.peers),
 	}
+}
+
+// SubmitTransaction validates a network transaction and,
+// if valid, adds it to this node's pending transaction pool.
+func (n *Node) SubmitTransaction(
+	tx transaction.Transaction,
+) error {
+	if err := tx.ValidateNetwork(); err != nil {
+		return err
+	}
+
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	return n.blockchain.AddTransaction(tx)
+}
+
+// PendingCount returns the number of transactions waiting to be mined.
+func (n *Node) PendingCount() int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	return len(n.blockchain.PendingTransactions)
 }
