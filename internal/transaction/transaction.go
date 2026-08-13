@@ -80,6 +80,28 @@ func (tx Transaction) BasicValidate() error {
 	return nil
 }
 
+// ValidateNetwork validates a transaction received through the network.
+// Non-faucet network transactions must contain a valid public key
+// and Ed25519 signature.
+func (tx Transaction) ValidateNetwork() error {
+	if err := tx.BasicValidate(); err != nil {
+		return err
+	}
+
+	if tx.IsFaucet() {
+		return nil
+	}
+
+	if strings.TrimSpace(tx.PubKeyHex) == "" ||
+		strings.TrimSpace(tx.SigHex) == "" {
+		return errors.New(
+			"error: network transaction must include public key and signature",
+		)
+	}
+
+	return nil
+}
+
 // Sign the transaction using a private key hex string. This sets PubKeyHex,
 // SigHex and overwrites From with the public key hex so identity is consistent.
 func (tx *Transaction) Sign(skHex string) error {
