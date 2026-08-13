@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"toy-blockchain/internal/node"
+	"toy-blockchain/internal/transaction"
 )
 
 // Server exposes a blockchain node through HTTP.
@@ -24,6 +25,10 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /status", s.handleStatus)
+	mux.HandleFunc(
+		"POST /transactions",
+		s.handleTransaction,
+	)
 
 	return mux
 }
@@ -43,6 +48,52 @@ func (s *Server) handleStatus(
 			"failed to encode status",
 			http.StatusInternalServerError,
 		)
+		return
+	}
+}
+
+// handleTransaction accepts a transaction and adds it
+// to the node's pending pool if it is valid.
+func (s *Server) handleTransaction(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	var tx transaction.Transaction
+
+	if err := json.NewDecoder(r.Body).Decode(&tx); err != nil {
+		http.Error(
+			w,
+			"invalid transaction JSON",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := s.node.SubmitTransaction(tx); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	w.WriteHeader(http.StatusCreated)
+
+	response := struct {
+		Status       string `json:"status"`
+		PendingCount int    `json:"pending_count"`
+	}{
+		Status:       "accepted",
+		PendingCount: s.node.PendingCount(),
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		return
 	}
 }
