@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest" //this let us test HTTP handler without actually starting port 8001
+	"strings"
 	"testing"
 
 	"toy-blockchain/chain"
@@ -76,6 +77,59 @@ func TestStatusEndpoint(t *testing.T) {
 		t.Fatalf(
 			"expected 2 peers, got %d",
 			status.PeerCount,
+		)
+	}
+}
+func TestTransactionEndpointRejectsUnsignedTransaction(
+	t *testing.T,
+) {
+	n := node.New(
+		"localhost:8001",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	server := api.NewServer(n)
+
+	body := strings.NewReader(`
+		{
+			"from": "Alice",
+			"to": "Bob",
+			"amount": 10
+		}
+	`)
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/transactions",
+		body,
+	)
+
+	request.Header.Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	recorder := httptest.NewRecorder()
+
+	server.Handler().ServeHTTP(
+		recorder,
+		request,
+	)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusBadRequest,
+			recorder.Code,
+		)
+	}
+
+	if n.PendingCount() != 0 {
+		t.Fatalf(
+			"expected no pending transactions, got %d",
+			n.PendingCount(),
 		)
 	}
 }
