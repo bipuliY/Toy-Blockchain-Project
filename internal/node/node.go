@@ -135,10 +135,11 @@ func (n *Node) Status() Status {
 	}
 
 	return Status{
-		Address:   n.address,
-		Height:    height,
-		HeadHash:  headHash,
-		PeerCount: len(n.peers),
+		Address:      n.address,
+		Height:       height,
+		HeadHash:     headHash,
+		PeerCount:    len(n.peers),
+		PendingCount: len(n.blockchain.PendingTransactions),
 	}
 }
 
