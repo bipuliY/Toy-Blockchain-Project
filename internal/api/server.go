@@ -2,7 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
+
+	"toy-blockchain/internal/network"
 
 	"toy-blockchain/internal/node"
 	"toy-blockchain/internal/transaction"
@@ -10,13 +14,15 @@ import (
 
 // Server exposes a blockchain node through HTTP.
 type Server struct {
-	node *node.Node
+	node       *node.Node
+	peerClient *network.Client
 }
 
 // NewServer creates an HTTP server wrapper around a node.
 func NewServer(n *node.Node) *Server {
 	return &Server{
-		node: n,
+		node:       n,
+		peerClient: network.NewClient(),
 	}
 }
 
@@ -69,13 +75,56 @@ func (s *Server) handleTransaction(
 		return
 	}
 
+	// if err := s.node.SubmitTransaction(tx); err != nil {
+	// 	http.Error(
+	// 		w,
+	// 		err.Error(),
+	// 		http.StatusBadRequest,
+	// 	)
+	// 	return
+	// }
 	if err := s.node.SubmitTransaction(tx); err != nil {
+		if errors.Is(
+			err,
+			node.ErrTransactionAlreadySeen,
+		) {
+			w.Header().Set(
+				"Content-Type",
+				"application/json",
+			)
+
+			w.WriteHeader(http.StatusOK)
+
+			_ = json.NewEncoder(w).Encode(
+				map[string]any{
+					"status": "duplicate",
+				},
+			)
+
+			return
+		}
+
 		http.Error(
 			w,
 			err.Error(),
 			http.StatusBadRequest,
 		)
+
 		return
+	}
+	for _, peer := range s.node.Peers() {
+		if err := s.peerClient.SendTransaction(
+			r.Context(),
+			peer,
+			tx,
+		); err != nil {
+			log.Printf(
+				"transaction gossip failed peer=%s tx=%s error=%v",
+				peer,
+				tx.ID(),
+				err,
+			)
+		}
 	}
 
 	w.Header().Set(

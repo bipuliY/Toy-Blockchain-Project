@@ -103,3 +103,63 @@ func TestSendTransaction(t *testing.T) {
 		)
 	}
 }
+func TestTransactionPropagatesToPeer(t *testing.T) {
+	nodeB := node.New(
+		"node-b",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	serverB := httptest.NewServer(
+		api.NewServer(nodeB).Handler(),
+	)
+	defer serverB.Close()
+
+	nodeA := node.New(
+		"node-a",
+		[]string{
+			serverB.URL,
+		},
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	serverA := httptest.NewServer(
+		api.NewServer(nodeA).Handler(),
+	)
+	defer serverA.Close()
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	client := network.NewClient()
+
+	if err := client.SendTransaction(
+		context.Background(),
+		serverA.URL,
+		tx,
+	); err != nil {
+		t.Fatalf(
+			"failed to submit transaction: %v",
+			err,
+		)
+	}
+
+	if nodeA.PendingCount() != 1 {
+		t.Fatalf(
+			"expected node A pending count 1, got %d",
+			nodeA.PendingCount(),
+		)
+	}
+
+	if nodeB.PendingCount() != 1 {
+		t.Fatalf(
+			"expected node B pending count 1, got %d",
+			nodeB.PendingCount(),
+		)
+	}
+}

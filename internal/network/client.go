@@ -140,7 +140,8 @@ func (c *Client) SendTransaction(
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusCreated &&
+		resp.StatusCode != http.StatusOK {
 		return fmt.Errorf(
 			"peer rejected transaction with status %d",
 			resp.StatusCode,
