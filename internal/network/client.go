@@ -1,6 +1,7 @@
 package network
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"toy-blockchain/internal/node"
+	"toy-blockchain/internal/transaction"
 )
 
 // Client sends HTTP requests to peer blockchain nodes.
@@ -82,4 +84,68 @@ func (c *Client) FetchStatus(
 	}
 
 	return status, nil
+}
+
+// SendTransaction sends a transaction to a peer node.
+func (c *Client) SendTransaction(
+	ctx context.Context,
+	peerURL string,
+	tx transaction.Transaction,
+) error {
+	peerURL = strings.TrimRight(
+		strings.TrimSpace(peerURL),
+		"/",
+	)
+
+	if peerURL == "" {
+		return fmt.Errorf(
+			"peer URL is required",
+		)
+	}
+
+	body, err := json.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf(
+			"encode transaction: %w",
+			err,
+		)
+	}
+
+	url := peerURL + "/transactions"
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		url,
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"create transaction request: %w",
+			err,
+		)
+	}
+
+	req.Header.Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf(
+			"send transaction to peer: %w",
+			err,
+		)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf(
+			"peer rejected transaction with status %d",
+			resp.StatusCode,
+		)
+	}
+
+	return nil
 }
