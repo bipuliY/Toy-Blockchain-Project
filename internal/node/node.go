@@ -1,11 +1,16 @@
 package node
 
 import (
+	"errors"
 	"strings"
 	"sync"
 
 	"toy-blockchain/chain"
 	"toy-blockchain/internal/transaction"
+)
+
+var ErrTransactionAlreadySeen = errors.New(
+	"transaction already seen",
 )
 
 // Node represents one running blockchain node.
@@ -21,9 +26,10 @@ import (
 type Node struct {
 	mu sync.RWMutex //protect shared state
 
-	blockchain *chain.Blockchain // the node's copy of the blockchain
-	address    string
-	peers      map[string]struct{}
+	blockchain       *chain.Blockchain // the node's copy of the blockchain
+	address          string
+	peers            map[string]struct{}
+	seenTransactions map[string]struct{}
 }
 
 // Status represents a read-only snapshot of the node.
@@ -57,9 +63,10 @@ func New(
 	}
 
 	return &Node{
-		blockchain: chain.NewBlockchain(difficulty, blockSize),
-		address:    strings.TrimSpace(address),
-		peers:      peerSet,
+		blockchain:       chain.NewBlockchain(difficulty, blockSize),
+		address:          strings.TrimSpace(address),
+		peers:            peerSet,
+		seenTransactions: make(map[string]struct{}),
 	}
 }
 
@@ -136,6 +143,18 @@ func (n *Node) Status() Status {
 
 // SubmitTransaction validates a network transaction and,
 // if valid, adds it to this node's pending transaction pool.
+// func (n *Node) SubmitTransaction(
+// 	tx transaction.Transaction,
+// ) error {
+// 	if err := tx.ValidateNetwork(); err != nil {
+// 		return err
+// 	}
+
+// 	n.mu.Lock()
+// 	defer n.mu.Unlock()
+
+//		return n.blockchain.AddTransaction(tx)
+//	}
 func (n *Node) SubmitTransaction(
 	tx transaction.Transaction,
 ) error {
@@ -143,10 +162,22 @@ func (n *Node) SubmitTransaction(
 		return err
 	}
 
+	txID := tx.ID()
+
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	return n.blockchain.AddTransaction(tx)
+	if _, exists := n.seenTransactions[txID]; exists {
+		return ErrTransactionAlreadySeen
+	}
+
+	if err := n.blockchain.AddTransaction(tx); err != nil {
+		return err
+	}
+
+	n.seenTransactions[txID] = struct{}{}
+
+	return nil
 }
 
 // PendingCount returns the number of transactions waiting to be mined.

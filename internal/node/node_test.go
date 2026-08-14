@@ -1,6 +1,7 @@
 package node
 
 import (
+	"errors"
 	"testing"
 
 	"crypto/ed25519"
@@ -171,6 +172,46 @@ func TestSubmitTransactionAcceptsSignedTransaction(t *testing.T) {
 	if n.PendingCount() != 2 {
 		t.Fatalf(
 			"expected 2 pending transactions, got %d",
+			n.PendingCount(),
+		)
+	}
+}
+func TestSubmitTransactionRejectsDuplicate(t *testing.T) {
+	n := New(
+		"localhost:8001",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := n.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"first submission failed: %v",
+			err,
+		)
+	}
+
+	err := n.SubmitTransaction(tx)
+
+	if !errors.Is(
+		err,
+		ErrTransactionAlreadySeen,
+	) {
+		t.Fatalf(
+			"expected duplicate transaction error, got %v",
+			err,
+		)
+	}
+
+	if n.PendingCount() != 1 {
+		t.Fatalf(
+			"expected 1 pending transaction, got %d",
 			n.PendingCount(),
 		)
 	}
