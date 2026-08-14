@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
+	"toy-blockchain/block"
 	"toy-blockchain/internal/network"
-
 	"toy-blockchain/internal/node"
 	"toy-blockchain/internal/transaction"
 )
@@ -28,8 +28,12 @@ func NewServer(n *node.Node) *Server {
 
 // Handler returns the HTTP handler used by the node server.
 func (s *Server) Handler() http.Handler {
-	mux := http.NewServeMux()
 
+	mux := http.NewServeMux()
+	mux.HandleFunc(
+		"POST /mine",
+		s.handleMine,
+	)
 	mux.HandleFunc("GET /status", s.handleStatus)
 	mux.HandleFunc(
 		"POST /transactions",
@@ -140,6 +144,41 @@ func (s *Server) handleTransaction(
 	}{
 		Status:       "accepted",
 		PendingCount: s.node.PendingCount(),
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		return
+	}
+}
+
+// handleMine mines the node's pending transactions.
+func (s *Server) handleMine(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	minedBlock, mineResult, err := s.node.MinePending()
+	if err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	response := struct {
+		Status     string           `json:"status"`
+		Block      block.Block      `json:"block"`
+		MineResult block.MineResult `json:"mine_result"`
+	}{
+		Status:     "mined",
+		Block:      minedBlock,
+		MineResult: mineResult,
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {

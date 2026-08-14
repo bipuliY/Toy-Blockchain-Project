@@ -215,3 +215,59 @@ func TestTransactionEndpointAcceptsSignedTransaction(t *testing.T) {
 		)
 	}
 }
+func TestMineEndpoint(t *testing.T) {
+	n := node.New(
+		"localhost:8001",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := n.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"failed to submit transaction: %v",
+			err,
+		)
+	}
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/mine",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+
+	api.NewServer(n).
+		Handler().
+		ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf(
+			"expected status %d, got %d: %s",
+			http.StatusOK,
+			recorder.Code,
+			recorder.Body.String(),
+		)
+	}
+
+	if n.Height() != 1 {
+		t.Fatalf(
+			"expected height 1, got %d",
+			n.Height(),
+		)
+	}
+
+	if n.PendingCount() != 0 {
+		t.Fatalf(
+			"expected 0 pending transactions, got %d",
+			n.PendingCount(),
+		)
+	}
+}
