@@ -48,6 +48,7 @@ func TestNewNode(t *testing.T) {
 	}
 }
 func TestNodeStatus(t *testing.T) {
+
 	n := New(
 		"localhost:8001",
 		[]string{
@@ -82,6 +83,12 @@ func TestNodeStatus(t *testing.T) {
 		t.Fatalf(
 			"expected 2 peers, got %d",
 			status.PeerCount,
+		)
+	}
+	if status.PendingCount != 0 {
+		t.Fatalf(
+			"expected pending count 0, got %d",
+			status.PendingCount,
 		)
 	}
 }

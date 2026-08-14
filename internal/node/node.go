@@ -34,10 +34,11 @@ type Node struct {
 
 // Status represents a read-only snapshot of the node.
 type Status struct {
-	Address   string `json:"address"`
-	Height    int    `json:"height"`
-	HeadHash  string `json:"head_hash"`
-	PeerCount int    `json:"peer_count"`
+	Address      string `json:"address"`
+	Height       int    `json:"height"`
+	HeadHash     string `json:"head_hash"`
+	PeerCount    int    `json:"peer_count"`
+	PendingCount int    `json:"pending_count"`
 }
 
 // New creates a new blockchain node.
