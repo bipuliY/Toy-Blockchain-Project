@@ -55,3 +55,44 @@ func TestValidateNetworkAcceptsValidSignedTransaction(t *testing.T) {
 		)
 	}
 }
+func TestTransactionIDIsDeterministic(t *testing.T) {
+	tx := New(
+		"Alice",
+		"Bob",
+		10,
+	)
+
+	first := tx.ID()
+	second := tx.ID()
+
+	if first == "" {
+		t.Fatal("expected transaction ID")
+	}
+
+	if first != second {
+		t.Fatalf(
+			"expected identical IDs, got %s and %s",
+			first,
+			second,
+		)
+	}
+}
+func TestTransactionIDChangesWhenTransactionChanges(t *testing.T) {
+	tx := New(
+		"Alice",
+		"Bob",
+		10,
+	)
+
+	originalID := tx.ID()
+
+	tx.Amount = 20
+
+	changedID := tx.ID()
+
+	if originalID == changedID {
+		t.Fatal(
+			"expected transaction ID to change after transaction changed",
+		)
+	}
+}

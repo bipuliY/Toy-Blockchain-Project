@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -131,4 +132,20 @@ func (tx *Transaction) Sign(skHex string) error {
 func (tx Transaction) signingBytes() []byte {
 	// Deterministic signing over From|To|Amount in this order.
 	return []byte(fmt.Sprintf("%s|%s|%d", tx.From, tx.To, tx.Amount))
+}
+
+// ID returns a deterministic identifier for the transaction.
+func (tx Transaction) ID() string {
+	data := fmt.Sprintf(
+		"%s|%s|%d|%s|%s",
+		strings.TrimSpace(tx.From),
+		strings.TrimSpace(tx.To),
+		tx.Amount,
+		strings.TrimSpace(tx.PubKeyHex),
+		strings.TrimSpace(tx.SigHex),
+	)
+
+	hash := sha256.Sum256([]byte(data))
+
+	return hex.EncodeToString(hash[:])
 }
