@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"toy-blockchain/block"
 	"toy-blockchain/chain"
 	"toy-blockchain/internal/transaction"
 )
@@ -69,6 +70,18 @@ func New(
 		peers:            peerSet,
 		seenTransactions: make(map[string]struct{}),
 	}
+}
+
+// MinePending mines pending transactions into a new block.
+func (n *Node) MinePending() (
+	block.Block,
+	block.MineResult,
+	error,
+) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	return n.blockchain.MinePending()
 }
 
 // Address returns the configured address of this node.

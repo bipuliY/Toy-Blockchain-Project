@@ -223,3 +223,60 @@ func TestSubmitTransactionRejectsDuplicate(t *testing.T) {
 		)
 	}
 }
+func TestMinePending(t *testing.T) {
+	n := New(
+		"localhost:8001",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := n.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"failed to submit transaction: %v",
+			err,
+		)
+	}
+
+	if n.PendingCount() != 1 {
+		t.Fatalf(
+			"expected 1 pending transaction before mining, got %d",
+			n.PendingCount(),
+		)
+	}
+
+	minedBlock, _, err := n.MinePending()
+	if err != nil {
+		t.Fatalf(
+			"failed to mine pending transaction: %v",
+			err,
+		)
+	}
+
+	if minedBlock.Height != 1 {
+		t.Fatalf(
+			"expected mined block height 1, got %d",
+			minedBlock.Height,
+		)
+	}
+
+	if n.Height() != 1 {
+		t.Fatalf(
+			"expected node height 1, got %d",
+			n.Height(),
+		)
+	}
+
+	if n.PendingCount() != 0 {
+		t.Fatalf(
+			"expected pending count 0 after mining, got %d",
+			n.PendingCount(),
+		)
+	}
+}
