@@ -2,6 +2,7 @@ package node
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -201,4 +202,116 @@ func (n *Node) PendingCount() int {
 	defer n.mu.RUnlock()
 
 	return len(n.blockchain.PendingTransactions)
+}
+
+// AcceptBlock validates a block received from a peer and,
+// if valid, appends it to the current blockchain.
+func (n *Node) AcceptBlock(
+	b block.Block,
+) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if len(n.blockchain.Blocks) == 0 {
+		return errors.New(
+			"blockchain has no genesis block",
+		)
+	}
+
+	expectedHeight := len(n.blockchain.Blocks)
+
+	if b.Height != expectedHeight {
+		return fmt.Errorf(
+			"unexpected block height: expected %d, got %d",
+			expectedHeight,
+			b.Height,
+		)
+	}
+
+	currentHead :=
+		n.blockchain.Blocks[len(n.blockchain.Blocks)-1]
+
+	if b.PrevHash != currentHead.Hash {
+		return errors.New(
+			"block does not extend current head",
+		)
+	}
+
+	// Network blocks must contain valid network transactions.
+	for _, tx := range b.Transactions {
+		if err := tx.ValidateNetwork(); err != nil {
+			return fmt.Errorf(
+				"invalid block transaction: %w",
+				err,
+			)
+		}
+	}
+
+	// Validate using a temporary candidate chain first.
+	// Do not modify the real blockchain until validation passes.
+	candidate := *n.blockchain
+
+	candidate.Blocks = append(
+		[]block.Block(nil),
+		n.blockchain.Blocks...,
+	)
+
+	candidate.Blocks = append(
+		candidate.Blocks,
+		b,
+	)
+
+	// Store the difficulty expected for the block after this one.
+	candidate.Difficulty =
+		candidate.CalculateNextDifficulty()
+
+	validation := candidate.Validate()
+
+	if !validation.Valid {
+		return fmt.Errorf(
+			"invalid block: %s",
+			validation.Reason,
+		)
+	}
+
+	// Find transactions that are now confirmed in this block.
+	confirmed := make(
+		map[string]struct{},
+		len(b.Transactions),
+	)
+
+	for _, tx := range b.Transactions {
+		confirmed[tx.ID()] = struct{}{}
+	}
+
+	// Rebuild the pending pool.
+	oldPending := append(
+		[]transaction.Transaction(nil),
+		n.blockchain.PendingTransactions...,
+	)
+
+	candidate.PendingTransactions = nil
+
+	for _, tx := range oldPending {
+		if _, exists := confirmed[tx.ID()]; exists {
+			continue
+		}
+
+		// Keep only transactions that are still valid after
+		// accepting the new block.
+		if err := candidate.AddTransaction(tx); err != nil {
+			continue
+		}
+	}
+
+	// Everything passed. Now replace the real chain.
+	n.blockchain = &candidate
+
+	// Transactions confirmed by a block should also remain
+	// known to this node, so they cannot be submitted again.
+	for _, tx := range b.Transactions {
+		n.seenTransactions[tx.ID()] = struct{}{}
+	}
+
+	return nil
 }

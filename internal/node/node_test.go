@@ -280,3 +280,76 @@ func TestMinePending(t *testing.T) {
 		)
 	}
 }
+func TestAcceptBlock(t *testing.T) {
+	nodeA := New(
+		"localhost:8001",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	nodeB := New(
+		"localhost:8002",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	// Simulate transaction gossip.
+	if err := nodeA.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"node A submit failed: %v",
+			err,
+		)
+	}
+
+	if err := nodeB.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"node B submit failed: %v",
+			err,
+		)
+	}
+
+	minedBlock, _, err := nodeA.MinePending()
+	if err != nil {
+		t.Fatalf(
+			"node A mining failed: %v",
+			err,
+		)
+	}
+
+	if err := nodeB.AcceptBlock(minedBlock); err != nil {
+		t.Fatalf(
+			"node B rejected valid block: %v",
+			err,
+		)
+	}
+
+	if nodeB.Height() != 1 {
+		t.Fatalf(
+			"expected node B height 1, got %d",
+			nodeB.Height(),
+		)
+	}
+
+	if nodeB.HeadHash() != minedBlock.Hash {
+		t.Fatalf(
+			"expected node B head %s, got %s",
+			minedBlock.Hash,
+			nodeB.HeadHash(),
+		)
+	}
+
+	if nodeB.PendingCount() != 0 {
+		t.Fatalf(
+			"expected node B pending count 0, got %d",
+			nodeB.PendingCount(),
+		)
+	}
+}
