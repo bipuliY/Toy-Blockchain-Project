@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"toy-blockchain/block"
+
 	"toy-blockchain/internal/node"
 	"toy-blockchain/internal/transaction"
 )
@@ -144,6 +146,71 @@ func (c *Client) SendTransaction(
 		resp.StatusCode != http.StatusOK {
 		return fmt.Errorf(
 			"peer rejected transaction with status %d",
+			resp.StatusCode,
+		)
+	}
+
+	return nil
+}
+
+// SendBlock sends a mined block to a peer node.
+func (c *Client) SendBlock(
+	ctx context.Context,
+	peerURL string,
+	b block.Block,
+) error {
+	peerURL = strings.TrimRight(
+		strings.TrimSpace(peerURL),
+		"/",
+	)
+
+	if peerURL == "" {
+		return fmt.Errorf(
+			"peer URL is required",
+		)
+	}
+
+	body, err := json.Marshal(b)
+	if err != nil {
+		return fmt.Errorf(
+			"encode block: %w",
+			err,
+		)
+	}
+
+	url := peerURL + "/blocks"
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		url,
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"create block request: %w",
+			err,
+		)
+	}
+
+	req.Header.Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf(
+			"send block to peer: %w",
+			err,
+		)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated &&
+		resp.StatusCode != http.StatusOK {
+		return fmt.Errorf(
+			"peer rejected block with status %d",
 			resp.StatusCode,
 		)
 	}

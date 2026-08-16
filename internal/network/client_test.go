@@ -10,6 +10,11 @@ import (
 	"toy-blockchain/internal/network"
 	"toy-blockchain/internal/node"
 	"toy-blockchain/internal/transaction"
+
+	"encoding/json"
+	"net/http"
+
+	"toy-blockchain/block"
 )
 
 func TestFetchStatus(t *testing.T) {
@@ -160,6 +165,78 @@ func TestTransactionPropagatesToPeer(t *testing.T) {
 		t.Fatalf(
 			"expected node B pending count 1, got %d",
 			nodeB.PendingCount(),
+		)
+	}
+}
+func TestSendBlock(t *testing.T) {
+	minedBlock := block.NewBlock(
+		1,
+		nil,
+		"previous-hash",
+	)
+
+	minedBlock.MineConcurrent(
+		1,
+		1,
+	)
+
+	server := httptest.NewServer(
+		http.HandlerFunc(
+			func(
+				w http.ResponseWriter,
+				r *http.Request,
+			) {
+				if r.Method != http.MethodPost {
+					t.Fatalf(
+						"expected POST, got %s",
+						r.Method,
+					)
+				}
+
+				if r.URL.Path != "/blocks" {
+					t.Fatalf(
+						"expected /blocks, got %s",
+						r.URL.Path,
+					)
+				}
+
+				var received block.Block
+
+				if err := json.NewDecoder(
+					r.Body,
+				).Decode(&received); err != nil {
+					t.Fatalf(
+						"failed to decode block: %v",
+						err,
+					)
+				}
+
+				if received.Hash != minedBlock.Hash {
+					t.Fatalf(
+						"expected block hash %s, got %s",
+						minedBlock.Hash,
+						received.Hash,
+					)
+				}
+
+				w.WriteHeader(
+					http.StatusCreated,
+				)
+			},
+		),
+	)
+	defer server.Close()
+
+	client := network.NewClient()
+
+	if err := client.SendBlock(
+		context.Background(),
+		server.URL,
+		minedBlock,
+	); err != nil {
+		t.Fatalf(
+			"send block failed: %v",
+			err,
 		)
 	}
 }
