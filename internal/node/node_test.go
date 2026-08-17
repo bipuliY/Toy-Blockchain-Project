@@ -417,3 +417,62 @@ func TestAcceptBlockRejectsDuplicate(
 		)
 	}
 }
+func TestBlocksFrom(t *testing.T) {
+	n := New(
+		"node-a",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := n.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"failed to submit transaction: %v",
+			err,
+		)
+	}
+
+	minedBlock, _, err := n.MinePending()
+	if err != nil {
+		t.Fatalf(
+			"failed to mine block: %v",
+			err,
+		)
+	}
+
+	blocks, err := n.BlocksFrom(1)
+	if err != nil {
+		t.Fatalf(
+			"BlocksFrom failed: %v",
+			err,
+		)
+	}
+
+	if len(blocks) != 1 {
+		t.Fatalf(
+			"expected 1 block, got %d",
+			len(blocks),
+		)
+	}
+
+	if blocks[0].Height != 1 {
+		t.Fatalf(
+			"expected block height 1, got %d",
+			blocks[0].Height,
+		)
+	}
+
+	if blocks[0].Hash != minedBlock.Hash {
+		t.Fatalf(
+			"expected hash %s, got %s",
+			minedBlock.Hash,
+			blocks[0].Hash,
+		)
+	}
+}

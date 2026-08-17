@@ -155,6 +155,49 @@ func (n *Node) HeadHash() string {
 	return n.blockchain.Blocks[len(n.blockchain.Blocks)-1].Hash
 }
 
+// BlocksFrom returns a safe copy of blockchain blocks
+// starting at the given height.
+func (n *Node) BlocksFrom(
+	fromHeight int,
+) ([]block.Block, error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	if fromHeight < 0 {
+		return nil, errors.New(
+			"block height cannot be negative",
+		)
+	}
+
+	if fromHeight > len(n.blockchain.Blocks) {
+		return nil, fmt.Errorf(
+			"block height %d is beyond current chain",
+			fromHeight,
+		)
+	}
+
+	source := n.blockchain.Blocks[fromHeight:]
+
+	blocks := make(
+		[]block.Block,
+		len(source),
+	)
+
+	copy(blocks, source)
+
+	// Each block contains a transaction slice.
+	// Copy that slice too so callers cannot modify
+	// the node's internal blockchain data.
+	for i := range blocks {
+		blocks[i].Transactions = append(
+			[]transaction.Transaction(nil),
+			blocks[i].Transactions...,
+		)
+	}
+
+	return blocks, nil
+}
+
 // Peers returns a copy of the node's current peer list.
 //
 // Returning a copy prevents callers from modifying the internal peer map.
