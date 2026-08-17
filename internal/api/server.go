@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 
 	"toy-blockchain/block"
 	"toy-blockchain/internal/network"
@@ -49,6 +50,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc(
 		"POST /blocks",
 		s.handleBlock,
+	)
+	mux.HandleFunc(
+		"GET /blocks",
+		s.handleGetBlocks,
 	)
 
 	return mux
@@ -137,6 +142,72 @@ func (s *Server) handleBlock(
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
+		return
+	}
+}
+
+// handleGetBlocks returns blockchain blocks starting
+// from the requested height.
+func (s *Server) handleGetBlocks(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	fromValue := r.URL.Query().Get("from")
+
+	if fromValue == "" {
+		http.Error(
+			w,
+			"from query parameter is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	fromHeight, err := strconv.Atoi(fromValue)
+	if err != nil {
+		http.Error(
+			w,
+			"from must be an integer",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	blocks, err := s.node.BlocksFrom(
+		fromHeight,
+	)
+	if err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	response := struct {
+		From   int           `json:"from"`
+		Count  int           `json:"count"`
+		Blocks []block.Block `json:"blocks"`
+	}{
+		From:   fromHeight,
+		Count:  len(blocks),
+		Blocks: blocks,
+	}
+
+	if err := json.NewEncoder(w).Encode(
+		response,
+	); err != nil {
+		http.Error(
+			w,
+			"failed to encode blocks",
+			http.StatusInternalServerError,
+		)
 		return
 	}
 }

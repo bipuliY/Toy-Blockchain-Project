@@ -10,6 +10,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
+	"toy-blockchain/block"
 	"toy-blockchain/internal/transaction"
 
 	"toy-blockchain/chain"
@@ -351,6 +352,105 @@ func TestMineEndpointGossipsBlockToPeer(
 			"expected matching heads: A=%s B=%s",
 			nodeA.HeadHash(),
 			nodeB.HeadHash(),
+		)
+	}
+}
+func TestGetBlocksEndpoint(
+	t *testing.T,
+) {
+	n := node.New(
+		"node-a",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := n.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"failed to submit transaction: %v",
+			err,
+		)
+	}
+
+	minedBlock, _, err := n.MinePending()
+	if err != nil {
+		t.Fatalf(
+			"failed to mine block: %v",
+			err,
+		)
+	}
+
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/blocks?from=1",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+
+	api.NewServer(n).
+		Handler().
+		ServeHTTP(
+			recorder,
+			request,
+		)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf(
+			"expected status %d, got %d: %s",
+			http.StatusOK,
+			recorder.Code,
+			recorder.Body.String(),
+		)
+	}
+
+	var response struct {
+		From   int           `json:"from"`
+		Count  int           `json:"count"`
+		Blocks []block.Block `json:"blocks"`
+	}
+
+	if err := json.NewDecoder(
+		recorder.Body,
+	).Decode(&response); err != nil {
+		t.Fatalf(
+			"failed to decode response: %v",
+			err,
+		)
+	}
+
+	if response.From != 1 {
+		t.Fatalf(
+			"expected from 1, got %d",
+			response.From,
+		)
+	}
+
+	if response.Count != 1 {
+		t.Fatalf(
+			"expected 1 block, got %d",
+			response.Count,
+		)
+	}
+
+	if len(response.Blocks) != 1 {
+		t.Fatalf(
+			"expected 1 returned block, got %d",
+			len(response.Blocks),
+		)
+	}
+
+	if response.Blocks[0].Hash != minedBlock.Hash {
+		t.Fatalf(
+			"expected hash %s, got %s",
+			minedBlock.Hash,
+			response.Blocks[0].Hash,
 		)
 	}
 }
