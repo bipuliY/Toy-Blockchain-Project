@@ -240,3 +240,73 @@ func TestSendBlock(t *testing.T) {
 		)
 	}
 }
+func TestFetchBlocks(t *testing.T) {
+	peerNode := node.New(
+		"peer-node",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := peerNode.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"failed to submit transaction: %v",
+			err,
+		)
+	}
+
+	minedBlock, _, err := peerNode.MinePending()
+	if err != nil {
+		t.Fatalf(
+			"failed to mine block: %v",
+			err,
+		)
+	}
+
+	peerServer := httptest.NewServer(
+		api.NewServer(peerNode).Handler(),
+	)
+	defer peerServer.Close()
+
+	client := network.NewClient()
+
+	blocks, err := client.FetchBlocks(
+		context.Background(),
+		peerServer.URL,
+		1,
+	)
+	if err != nil {
+		t.Fatalf(
+			"fetch blocks failed: %v",
+			err,
+		)
+	}
+
+	if len(blocks) != 1 {
+		t.Fatalf(
+			"expected 1 block, got %d",
+			len(blocks),
+		)
+	}
+
+	if blocks[0].Height != 1 {
+		t.Fatalf(
+			"expected block height 1, got %d",
+			blocks[0].Height,
+		)
+	}
+
+	if blocks[0].Hash != minedBlock.Hash {
+		t.Fatalf(
+			"expected hash %s, got %s",
+			minedBlock.Hash,
+			blocks[0].Hash,
+		)
+	}
+}

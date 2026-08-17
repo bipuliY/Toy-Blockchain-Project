@@ -88,6 +88,83 @@ func (c *Client) FetchStatus(
 	return status, nil
 }
 
+// FetchBlocks requests blockchain blocks from a peer,
+// starting at the given height.
+func (c *Client) FetchBlocks(
+	ctx context.Context,
+	peerURL string,
+	fromHeight int,
+) ([]block.Block, error) {
+	peerURL = strings.TrimRight(
+		strings.TrimSpace(peerURL),
+		"/",
+	)
+
+	if peerURL == "" {
+		return nil, fmt.Errorf(
+			"peer URL is required",
+		)
+	}
+
+	if fromHeight < 0 {
+		return nil, fmt.Errorf(
+			"block height cannot be negative",
+		)
+	}
+
+	url := fmt.Sprintf(
+		"%s/blocks?from=%d",
+		peerURL,
+		fromHeight,
+	)
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		url,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"create blocks request: %w",
+			err,
+		)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"request peer blocks: %w",
+			err,
+		)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf(
+			"peer returned blocks status %d",
+			resp.StatusCode,
+		)
+	}
+
+	var response struct {
+		From   int           `json:"from"`
+		Count  int           `json:"count"`
+		Blocks []block.Block `json:"blocks"`
+	}
+
+	if err := json.NewDecoder(
+		resp.Body,
+	).Decode(&response); err != nil {
+		return nil, fmt.Errorf(
+			"decode peer blocks: %w",
+			err,
+		)
+	}
+
+	return response.Blocks, nil
+}
+
 // SendTransaction sends a transaction to a peer node.
 func (c *Client) SendTransaction(
 	ctx context.Context,
