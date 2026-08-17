@@ -353,3 +353,67 @@ func TestAcceptBlock(t *testing.T) {
 		)
 	}
 }
+func TestAcceptBlockRejectsDuplicate(
+	t *testing.T,
+) {
+	nodeA := New(
+		"node-a",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	nodeB := New(
+		"node-b",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := nodeA.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"submit transaction failed: %v",
+			err,
+		)
+	}
+
+	minedBlock, _, err := nodeA.MinePending()
+	if err != nil {
+		t.Fatalf(
+			"mine block failed: %v",
+			err,
+		)
+	}
+
+	if err := nodeB.AcceptBlock(minedBlock); err != nil {
+		t.Fatalf(
+			"first block acceptance failed: %v",
+			err,
+		)
+	}
+
+	err = nodeB.AcceptBlock(minedBlock)
+
+	if !errors.Is(
+		err,
+		ErrBlockAlreadySeen,
+	) {
+		t.Fatalf(
+			"expected duplicate block error, got %v",
+			err,
+		)
+	}
+
+	if nodeB.Height() != 1 {
+		t.Fatalf(
+			"expected height 1, got %d",
+			nodeB.Height(),
+		)
+	}
+}

@@ -14,6 +14,9 @@ import (
 var ErrTransactionAlreadySeen = errors.New(
 	"transaction already seen",
 )
+var ErrBlockAlreadySeen = errors.New(
+	"block already seen",
+)
 
 // Node represents one running blockchain node.
 //
@@ -32,6 +35,7 @@ type Node struct {
 	address          string
 	peers            map[string]struct{}
 	seenTransactions map[string]struct{}
+	seenBlocks       map[string]struct{}
 }
 
 // Status represents a read-only snapshot of the node.
@@ -70,10 +74,31 @@ func New(
 		address:          strings.TrimSpace(address),
 		peers:            peerSet,
 		seenTransactions: make(map[string]struct{}),
+		seenBlocks:       make(map[string]struct{}),
 	}
 }
 
 // MinePending mines pending transactions into a new block.
+// func (n *Node) MinePending() (
+// 	block.Block,
+// 	block.MineResult,
+// 	error,
+// ) {
+// 	n.mu.Lock()
+// 	defer n.mu.Unlock()
+
+// 	// return n.blockchain.MinePending()
+// 	minedBlock, result, err :=
+// 	n.blockchain.MinePending()
+
+// if err != nil {
+// 	return block.Block{}, block.MineResult{}, err
+// }
+
+// n.seenBlocks[minedBlock.Hash] = struct{}{}
+
+// return minedBlock, result, nil
+// }
 func (n *Node) MinePending() (
 	block.Block,
 	block.MineResult,
@@ -82,7 +107,18 @@ func (n *Node) MinePending() (
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	return n.blockchain.MinePending()
+	minedBlock, result, err :=
+		n.blockchain.MinePending()
+
+	if err != nil {
+		return block.Block{}, block.MineResult{}, err
+	}
+
+	// This node mined the block itself,
+	// so it has already seen this block.
+	n.seenBlocks[minedBlock.Hash] = struct{}{}
+
+	return minedBlock, result, nil
 }
 
 // Address returns the configured address of this node.
@@ -211,7 +247,9 @@ func (n *Node) AcceptBlock(
 ) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-
+	if _, exists := n.seenBlocks[b.Hash]; exists {
+		return ErrBlockAlreadySeen
+	}
 	if len(n.blockchain.Blocks) == 0 {
 		return errors.New(
 			"blockchain has no genesis block",
@@ -312,6 +350,8 @@ func (n *Node) AcceptBlock(
 	for _, tx := range b.Transactions {
 		n.seenTransactions[tx.ID()] = struct{}{}
 	}
+
+	n.seenBlocks[b.Hash] = struct{}{}
 
 	return nil
 }
