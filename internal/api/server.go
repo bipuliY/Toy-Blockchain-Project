@@ -28,19 +28,117 @@ func NewServer(n *node.Node) *Server {
 
 // Handler returns the HTTP handler used by the node server.
 func (s *Server) Handler() http.Handler {
-
 	mux := http.NewServeMux()
+
 	mux.HandleFunc(
 		"POST /mine",
 		s.handleMine,
 	)
-	mux.HandleFunc("GET /status", s.handleStatus)
+
+	mux.HandleFunc(
+		"GET /status",
+		s.handleStatus,
+	)
+
 	mux.HandleFunc(
 		"POST /transactions",
 		s.handleTransaction,
 	)
 
+	// IMPORTANT: this route was missing
+	mux.HandleFunc(
+		"POST /blocks",
+		s.handleBlock,
+	)
+
 	return mux
+}
+func (s *Server) handleBlock(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	var receivedBlock block.Block
+
+	if err := json.NewDecoder(r.Body).Decode(
+		&receivedBlock,
+	); err != nil {
+		http.Error(
+			w,
+			"invalid block JSON",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := s.node.AcceptBlock(
+		receivedBlock,
+	); err != nil {
+
+		if errors.Is(
+			err,
+			node.ErrBlockAlreadySeen,
+		) {
+			w.Header().Set(
+				"Content-Type",
+				"application/json",
+			)
+
+			w.WriteHeader(http.StatusOK)
+
+			_ = json.NewEncoder(w).Encode(
+				map[string]any{
+					"status": "duplicate",
+				},
+			)
+
+			return
+		}
+
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+
+		return
+	}
+
+	// Forward a newly accepted block to peers.
+	for _, peer := range s.node.Peers() {
+		if err := s.peerClient.SendBlock(
+			r.Context(),
+			peer,
+			receivedBlock,
+		); err != nil {
+			log.Printf(
+				"block gossip failed peer=%s block=%s error=%v",
+				peer,
+				receivedBlock.Hash,
+				err,
+			)
+		}
+	}
+
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	w.WriteHeader(http.StatusCreated)
+
+	response := struct {
+		Status   string `json:"status"`
+		Height   int    `json:"height"`
+		HeadHash string `json:"head_hash"`
+	}{
+		Status:   "accepted",
+		Height:   s.node.Height(),
+		HeadHash: s.node.HeadHash(),
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		return
+	}
 }
 
 // handleStatus returns the node's current status as JSON.
@@ -87,6 +185,7 @@ func (s *Server) handleTransaction(
 	// 	)
 	// 	return
 	// }
+
 	if err := s.node.SubmitTransaction(tx); err != nil {
 		if errors.Is(
 			err,
@@ -166,6 +265,22 @@ func (s *Server) handleMine(
 		return
 	}
 
+	// Automatically gossip the newly mined block.
+	for _, peer := range s.node.Peers() {
+		if err := s.peerClient.SendBlock(
+			r.Context(),
+			peer,
+			minedBlock,
+		); err != nil {
+			log.Printf(
+				"block gossip failed peer=%s block=%s error=%v",
+				peer,
+				minedBlock.Hash,
+				err,
+			)
+		}
+	}
+
 	w.Header().Set(
 		"Content-Type",
 		"application/json",
@@ -181,7 +296,56 @@ func (s *Server) handleMine(
 		MineResult: mineResult,
 	}
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err := json.NewEncoder(w).Encode(
+		response,
+	); err != nil {
 		return
 	}
 }
+
+// func (s *Server) handleMine(
+// 	w http.ResponseWriter,
+// 	r *http.Request,
+// ) {
+// 	minedBlock, mineResult, err := s.node.MinePending()
+// 	if err != nil {
+// 		http.Error(
+// 			w,
+// 			err.Error(),
+// 			http.StatusBadRequest,
+// 		)
+// 		return
+// 	}
+// 	for _, peer := range s.node.Peers() {
+// 		if err := s.peerClient.SendBlock(
+// 			r.Context(),
+// 			peer,
+// 			minedBlock,
+// 		); err != nil {
+// 			log.Printf(
+// 				"block gossip failed peer=%s block=%s error=%v",
+// 				peer,
+// 				minedBlock.Hash,
+// 				err,
+// 			)
+// 		}
+// 	}
+// 	w.Header().Set(
+// 		"Content-Type",
+// 		"application/json",
+// 	)
+
+// 	response := struct {
+// 		Status     string           `json:"status"`
+// 		Block      block.Block      `json:"block"`
+// 		MineResult block.MineResult `json:"mine_result"`
+// 	}{
+// 		Status:     "mined",
+// 		Block:      minedBlock,
+// 		MineResult: mineResult,
+// 	}
+
+// 	if err := json.NewEncoder(w).Encode(response); err != nil {
+// 		return
+// 	}
+// }

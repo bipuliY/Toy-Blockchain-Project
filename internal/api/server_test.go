@@ -271,3 +271,86 @@ func TestMineEndpoint(t *testing.T) {
 		)
 	}
 }
+func TestMineEndpointGossipsBlockToPeer(
+	t *testing.T,
+) {
+	nodeB := node.New(
+		"node-b",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	serverB := httptest.NewServer(
+		api.NewServer(nodeB).Handler(),
+	)
+	defer serverB.Close()
+
+	nodeA := node.New(
+		"node-a",
+		[]string{
+			serverB.URL,
+		},
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := nodeA.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"failed to submit transaction: %v",
+			err,
+		)
+	}
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/mine",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+
+	api.NewServer(nodeA).
+		Handler().
+		ServeHTTP(
+			recorder,
+			request,
+		)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf(
+			"expected status %d, got %d: %s",
+			http.StatusOK,
+			recorder.Code,
+			recorder.Body.String(),
+		)
+	}
+
+	if nodeA.Height() != 1 {
+		t.Fatalf(
+			"expected node A height 1, got %d",
+			nodeA.Height(),
+		)
+	}
+
+	if nodeB.Height() != 1 {
+		t.Fatalf(
+			"expected node B height 1, got %d",
+			nodeB.Height(),
+		)
+	}
+
+	if nodeA.HeadHash() != nodeB.HeadHash() {
+		t.Fatalf(
+			"expected matching heads: A=%s B=%s",
+			nodeA.HeadHash(),
+			nodeB.HeadHash(),
+		)
+	}
+}
