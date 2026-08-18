@@ -86,7 +86,32 @@ func main() {
 			n.HeadHash(),
 		)
 	}
+	// Periodically check peers so a running node can
+	// catch up if it falls behind.
+	go func() {
+		ticker := time.NewTicker(
+			5 * time.Second,
+		)
+		defer ticker.Stop()
 
+		for range ticker.C {
+			for _, peer := range n.Peers() {
+				if err := syncer.SyncFromPeer(
+					context.Background(),
+					n,
+					peerClient,
+					peer,
+				); err != nil {
+					log.Printf(
+						"periodic sync failed peer=%s error=%v",
+						peer,
+						err,
+					)
+					continue
+				}
+			}
+		}
+	}()
 	apiServer := api.NewServer(n)
 
 	server := &http.Server{
