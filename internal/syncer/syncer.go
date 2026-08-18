@@ -2,10 +2,15 @@ package syncer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"toy-blockchain/internal/network"
 	"toy-blockchain/internal/node"
+)
+
+var ErrForkDetected = errors.New(
+	"fork detected",
 )
 
 // SyncFromPeer downloads and validates missing blocks
@@ -27,30 +32,75 @@ func SyncFromPeer(
 		)
 	}
 
-	localHeight := n.Height()
+	// Take one consistent snapshot of our local status.
+	localStatus := n.Status()
 
-	// Nothing to do if this node is already caught up.
-	if peerStatus.Height <= localHeight {
+	// Peer is shorter.
+	if peerStatus.Height < localStatus.Height {
 		return nil
 	}
 
-	fromHeight := localHeight + 1
+	// Same height.
+	if peerStatus.Height == localStatus.Height {
+		// Same height + same hash means both nodes agree.
+		if peerStatus.HeadHash == localStatus.HeadHash {
+			return nil
+		}
 
+		// Same height + different hash means fork.
+		return fmt.Errorf(
+			"%w: height=%d local_head=%s peer_head=%s",
+			ErrForkDetected,
+			localStatus.Height,
+			localStatus.HeadHash,
+			peerStatus.HeadHash,
+		)
+	}
+
+	// Peer is ahead.
+	//
+	// Start from our CURRENT height so we can compare
+	// our current head with the peer's block at that height.
 	blocks, err := client.FetchBlocks(
 		ctx,
 		peerURL,
-		fromHeight,
+		localStatus.Height,
 	)
 	if err != nil {
 		return fmt.Errorf(
-			"fetch missing blocks: %w",
+			"fetch peer blocks: %w",
 			err,
 		)
 	}
 
-	// Validate and append every downloaded block
-	// using the existing Node validation logic.
-	for _, b := range blocks {
+	if len(blocks) == 0 {
+		return fmt.Errorf(
+			"peer returned no blocks from height %d",
+			localStatus.Height,
+		)
+	}
+
+	if blocks[0].Height != localStatus.Height {
+		return fmt.Errorf(
+			"unexpected peer block height: expected %d, got %d",
+			localStatus.Height,
+			blocks[0].Height,
+		)
+	}
+
+	// Peer is ahead, but its chain has already diverged
+	// from ours.
+	if blocks[0].Hash != localStatus.HeadHash {
+		return fmt.Errorf(
+			"%w: chains differ at height %d",
+			ErrForkDetected,
+			localStatus.Height,
+		)
+	}
+
+	// blocks[0] is our existing current head.
+	// Accept only the newer blocks after it.
+	for _, b := range blocks[1:] {
 		if err := n.AcceptBlock(b); err != nil {
 			return fmt.Errorf(
 				"accept synced block height %d: %w",

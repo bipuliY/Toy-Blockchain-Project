@@ -2,6 +2,7 @@ package syncer_test
 
 import (
 	"context"
+	"errors"
 	"net/http/httptest"
 	"testing"
 
@@ -13,7 +14,9 @@ import (
 	"toy-blockchain/internal/transaction"
 )
 
-func TestSyncFromPeer(t *testing.T) {
+func TestSyncFromPeerDetectsFork(
+	t *testing.T,
+) {
 	peerNode := node.New(
 		"peer-node",
 		nil,
@@ -21,43 +24,68 @@ func TestSyncFromPeer(t *testing.T) {
 		chain.DefaultBlockSize,
 	)
 
-	tx1 := transaction.New(
+	localNode := node.New(
+		"local-node",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	// Peer mines its own Block 1.
+	peerTx := transaction.New(
 		transaction.Faucet,
 		"Alice",
 		100,
 	)
 
-	if err := peerNode.SubmitTransaction(tx1); err != nil {
+	if err := peerNode.SubmitTransaction(
+		peerTx,
+	); err != nil {
 		t.Fatalf(
-			"submit first transaction failed: %v",
+			"peer submit failed: %v",
 			err,
 		)
 	}
 
 	if _, _, err := peerNode.MinePending(); err != nil {
 		t.Fatalf(
-			"mine first block failed: %v",
+			"peer mining failed: %v",
 			err,
 		)
 	}
 
-	tx2 := transaction.New(
+	// Local node mines a DIFFERENT Block 1.
+	localTx := transaction.New(
 		transaction.Faucet,
 		"Bob",
 		50,
 	)
 
-	if err := peerNode.SubmitTransaction(tx2); err != nil {
+	if err := localNode.SubmitTransaction(
+		localTx,
+	); err != nil {
 		t.Fatalf(
-			"submit second transaction failed: %v",
+			"local submit failed: %v",
 			err,
 		)
 	}
 
-	if _, _, err := peerNode.MinePending(); err != nil {
+	if _, _, err := localNode.MinePending(); err != nil {
 		t.Fatalf(
-			"mine second block failed: %v",
+			"local mining failed: %v",
 			err,
+		)
+	}
+
+	if peerNode.Height() != localNode.Height() {
+		t.Fatal(
+			"expected nodes to have same height",
+		)
+	}
+
+	if peerNode.HeadHash() == localNode.HeadHash() {
+		t.Fatal(
+			"expected different head hashes",
 		)
 	}
 
@@ -66,40 +94,29 @@ func TestSyncFromPeer(t *testing.T) {
 	)
 	defer peerServer.Close()
 
-	freshNode := node.New(
-		"fresh-node",
-		nil,
-		chain.DefaultDifficulty,
-		chain.DefaultBlockSize,
-	)
-
 	client := network.NewClient()
 
-	if err := syncer.SyncFromPeer(
+	err := syncer.SyncFromPeer(
 		context.Background(),
-		freshNode,
+		localNode,
 		client,
 		peerServer.URL,
-	); err != nil {
+	)
+
+	if !errors.Is(
+		err,
+		syncer.ErrForkDetected,
+	) {
 		t.Fatalf(
-			"sync failed: %v",
+			"expected fork detected error, got %v",
 			err,
 		)
 	}
 
-	if freshNode.Height() != peerNode.Height() {
-		t.Fatalf(
-			"expected height %d, got %d",
-			peerNode.Height(),
-			freshNode.Height(),
-		)
-	}
-
-	if freshNode.HeadHash() != peerNode.HeadHash() {
-		t.Fatalf(
-			"expected matching head hashes: peer=%s fresh=%s",
-			peerNode.HeadHash(),
-			freshNode.HeadHash(),
+	// Detection must NOT replace the chain yet.
+	if localNode.HeadHash() == peerNode.HeadHash() {
+		t.Fatal(
+			"fork detection should not replace local chain",
 		)
 	}
 }
