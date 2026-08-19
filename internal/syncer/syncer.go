@@ -90,12 +90,34 @@ func SyncFromPeer(
 
 	// Peer is ahead, but its chain has already diverged
 	// from ours.
+	// The peer is ahead, but its chain is different
+	// from ours at our current height.
+	//
+	// Because the peer has the longer chain, download
+	// its complete chain and try a reorganization.
 	if blocks[0].Hash != localStatus.HeadHash {
-		return fmt.Errorf(
-			"%w: chains differ at height %d",
-			ErrForkDetected,
-			localStatus.Height,
+		fullChain, err := client.FetchBlocks(
+			ctx,
+			peerURL,
+			0,
 		)
+		if err != nil {
+			return fmt.Errorf(
+				"fetch full peer chain for reorg: %w",
+				err,
+			)
+		}
+
+		if err := n.AdoptCandidateChain(
+			fullChain,
+		); err != nil {
+			return fmt.Errorf(
+				"adopt longer peer chain: %w",
+				err,
+			)
+		}
+
+		return nil
 	}
 
 	// blocks[0] is our existing current head.
