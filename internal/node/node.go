@@ -323,6 +323,115 @@ func (n *Node) ValidateCandidateChain(
 	return nil
 }
 
+// AdoptCandidateChain replaces the local blockchain
+// with a valid longer candidate chain.
+//
+// Orphaned block transactions are restored separately.
+func (n *Node) AdoptCandidateChain(
+	blocks []block.Block,
+) error {
+	// Validate before taking the write lock.
+	//
+	// ValidateCandidateChain uses RLock internally,
+	// so calling it while holding Lock would deadlock.
+	if err := n.ValidateCandidateChain(
+		blocks,
+	); err != nil {
+		return err
+	}
+
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	// Re-check after acquiring the write lock because
+	// the local chain may have changed meanwhile.
+	if len(blocks) <= len(n.blockchain.Blocks) {
+		return fmt.Errorf(
+			"candidate chain is not longer: local height %d, candidate height %d",
+			len(n.blockchain.Blocks)-1,
+			len(blocks)-1,
+		)
+	}
+
+	// Copy the candidate blocks before storing them.
+	candidateBlocks := make(
+		[]block.Block,
+		len(blocks),
+	)
+
+	copy(
+		candidateBlocks,
+		blocks,
+	)
+
+	for i := range candidateBlocks {
+		candidateBlocks[i].Transactions = append(
+			[]transaction.Transaction(nil),
+			candidateBlocks[i].Transactions...,
+		)
+	}
+
+	// Keep the current pending transactions.
+	oldPending := append(
+		[]transaction.Transaction(nil),
+		n.blockchain.PendingTransactions...,
+	)
+
+	candidate := &chain.Blockchain{
+		Blocks:                 candidateBlocks,
+		PendingTransactions:    nil,
+		Difficulty:             candidateBlocks[len(candidateBlocks)-1].Difficulty,
+		BlockSize:              n.blockchain.BlockSize,
+		TargetBlockTimeSeconds: n.blockchain.TargetBlockTimeSeconds,
+		RetargetInterval:       n.blockchain.RetargetInterval,
+		MinDifficulty:          n.blockchain.MinDifficulty,
+		MaxDifficulty:          n.blockchain.MaxDifficulty,
+	}
+
+	candidate.Difficulty =
+		candidate.CalculateNextDifficulty()
+
+	// Record all transactions already confirmed
+	// by the new chain.
+	confirmed := make(
+		map[string]struct{},
+	)
+
+	for _, b := range candidateBlocks {
+		for _, tx := range b.Transactions {
+			confirmed[tx.ID()] = struct{}{}
+		}
+	}
+
+	// Re-add old pending transactions only if:
+	// 1. they are not already confirmed
+	// 2. they are still valid on the new ledger
+	for _, tx := range oldPending {
+		if _, exists := confirmed[tx.ID()]; exists {
+			continue
+		}
+
+		if err := candidate.AddTransaction(tx); err != nil {
+			continue
+		}
+	}
+
+	// Replace the real blockchain.
+	n.blockchain = candidate
+
+	// Mark blocks and transactions from the adopted
+	// chain as already known.
+	for _, b := range candidateBlocks {
+		n.seenBlocks[b.Hash] = struct{}{}
+
+		for _, tx := range b.Transactions {
+			n.seenTransactions[tx.ID()] = struct{}{}
+		}
+	}
+
+	return nil
+}
+
 // Peers returns a copy of the node's current peer list.
 //
 // Returning a copy prevents callers from modifying the internal peer map.

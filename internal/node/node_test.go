@@ -640,3 +640,126 @@ func TestValidateCandidateChainRejectsTampering(
 		)
 	}
 }
+
+func TestAdoptCandidateChain(
+	t *testing.T,
+) {
+	localNode := New(
+		"local-node",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	peerNode := New(
+		"peer-node",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	// Local node creates its own Block 1.
+	localTx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := localNode.SubmitTransaction(
+		localTx,
+	); err != nil {
+		t.Fatalf(
+			"local submit failed: %v",
+			err,
+		)
+	}
+
+	if _, _, err := localNode.MinePending(); err != nil {
+		t.Fatalf(
+			"local mining failed: %v",
+			err,
+		)
+	}
+
+	oldLocalHead := localNode.HeadHash()
+
+	// Peer creates a different Block 1.
+	peerTx1 := transaction.New(
+		transaction.Faucet,
+		"Bob",
+		50,
+	)
+
+	if err := peerNode.SubmitTransaction(
+		peerTx1,
+	); err != nil {
+		t.Fatalf(
+			"peer first submit failed: %v",
+			err,
+		)
+	}
+
+	if _, _, err := peerNode.MinePending(); err != nil {
+		t.Fatalf(
+			"peer first mining failed: %v",
+			err,
+		)
+	}
+
+	// Peer then creates Block 2,
+	// making its chain longer.
+	peerTx2 := transaction.New(
+		transaction.Faucet,
+		"Carol",
+		25,
+	)
+
+	if err := peerNode.SubmitTransaction(
+		peerTx2,
+	); err != nil {
+		t.Fatalf(
+			"peer second submit failed: %v",
+			err,
+		)
+	}
+
+	if _, _, err := peerNode.MinePending(); err != nil {
+		t.Fatalf(
+			"peer second mining failed: %v",
+			err,
+		)
+	}
+
+	candidate := peerNode.ChainSnapshot()
+
+	if err := localNode.AdoptCandidateChain(
+		candidate,
+	); err != nil {
+		t.Fatalf(
+			"adopt candidate failed: %v",
+			err,
+		)
+	}
+
+	if localNode.Height() != peerNode.Height() {
+		t.Fatalf(
+			"expected height %d, got %d",
+			peerNode.Height(),
+			localNode.Height(),
+		)
+	}
+
+	if localNode.HeadHash() != peerNode.HeadHash() {
+		t.Fatalf(
+			"expected adopted head %s, got %s",
+			peerNode.HeadHash(),
+			localNode.HeadHash(),
+		)
+	}
+
+	if localNode.HeadHash() == oldLocalHead {
+		t.Fatal(
+			"expected local chain to be replaced",
+		)
+	}
+}
