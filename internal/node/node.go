@@ -198,6 +198,35 @@ func (n *Node) BlocksFrom(
 	return blocks, nil
 }
 
+// ChainSnapshot returns a safe copy of the entire
+// blockchain owned by this node.
+func (n *Node) ChainSnapshot() []block.Block {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	blocks := make(
+		[]block.Block,
+		len(n.blockchain.Blocks),
+	)
+
+	copy(
+		blocks,
+		n.blockchain.Blocks,
+	)
+
+	// Each block contains its own transaction slice.
+	// Copy that slice too so callers cannot modify
+	// the node's internal blockchain data.
+	for i := range blocks {
+		blocks[i].Transactions = append(
+			[]transaction.Transaction(nil),
+			blocks[i].Transactions...,
+		)
+	}
+
+	return blocks
+}
+
 // Peers returns a copy of the node's current peer list.
 //
 // Returning a copy prevents callers from modifying the internal peer map.

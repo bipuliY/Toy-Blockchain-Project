@@ -476,3 +476,61 @@ func TestBlocksFrom(t *testing.T) {
 		)
 	}
 }
+func TestChainSnapshot(t *testing.T) {
+	n := New(
+		"node-a",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := n.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"submit transaction failed: %v",
+			err,
+		)
+	}
+
+	minedBlock, _, err := n.MinePending()
+	if err != nil {
+		t.Fatalf(
+			"mine block failed: %v",
+			err,
+		)
+	}
+
+	blocks := n.ChainSnapshot()
+
+	if len(blocks) != 2 {
+		t.Fatalf(
+			"expected 2 blocks including genesis, got %d",
+			len(blocks),
+		)
+	}
+
+	if blocks[1].Hash != minedBlock.Hash {
+		t.Fatalf(
+			"expected mined block hash %s, got %s",
+			minedBlock.Hash,
+			blocks[1].Hash,
+		)
+	}
+
+	// Modify the returned copy.
+	blocks[1].Transactions[0].To = "Changed"
+
+	// Get another snapshot.
+	fresh := n.ChainSnapshot()
+
+	if fresh[1].Transactions[0].To != "Alice" {
+		t.Fatal(
+			"modifying snapshot changed internal blockchain",
+		)
+	}
+}
