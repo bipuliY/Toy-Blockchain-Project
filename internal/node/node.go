@@ -370,7 +370,22 @@ func (n *Node) AdoptCandidateChain(
 			candidateBlocks[i].Transactions...,
 		)
 	}
+	// Save transactions from the old chain.
+	//
+	// If the old branch becomes orphaned during the reorg,
+	// transactions that are not confirmed by the new chain
+	// may need to return to the pending pool.
+	oldChainTransactions := make(
+		[]transaction.Transaction,
+		0,
+	)
 
+	for _, b := range n.blockchain.Blocks[1:] {
+		oldChainTransactions = append(
+			oldChainTransactions,
+			b.Transactions...,
+		)
+	}
 	// Keep the current pending transactions.
 	oldPending := append(
 		[]transaction.Transaction(nil),
@@ -406,14 +421,52 @@ func (n *Node) AdoptCandidateChain(
 	// Re-add old pending transactions only if:
 	// 1. they are not already confirmed
 	// 2. they are still valid on the new ledger
+	// Avoid adding the same transaction to the new
+	// pending pool more than once.
+	addedPending := make(
+		map[string]struct{},
+	)
+
+	// First restore transactions from blocks that belonged
+	// to the old chain but are not confirmed by the new chain.
+	for _, tx := range oldChainTransactions {
+		txID := tx.ID()
+
+		if _, exists := confirmed[txID]; exists {
+			continue
+		}
+
+		if _, exists := addedPending[txID]; exists {
+			continue
+		}
+
+		// Only restore the transaction if it is still valid
+		// against the ledger produced by the new chain.
+		if err := candidate.AddTransaction(tx); err != nil {
+			continue
+		}
+
+		addedPending[txID] = struct{}{}
+	}
+
+	// Then restore transactions that were already pending
+	// before the reorganization.
 	for _, tx := range oldPending {
-		if _, exists := confirmed[tx.ID()]; exists {
+		txID := tx.ID()
+
+		if _, exists := confirmed[txID]; exists {
+			continue
+		}
+
+		if _, exists := addedPending[txID]; exists {
 			continue
 		}
 
 		if err := candidate.AddTransaction(tx); err != nil {
 			continue
 		}
+
+		addedPending[txID] = struct{}{}
 	}
 
 	// Replace the real blockchain.

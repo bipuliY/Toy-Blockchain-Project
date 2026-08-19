@@ -763,3 +763,122 @@ func TestAdoptCandidateChain(
 		)
 	}
 }
+func TestAdoptCandidateChainRestoresOrphanedTransactions(
+	t *testing.T,
+) {
+	localNode := New(
+		"local-node",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	peerNode := New(
+		"peer-node",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	// This transaction will later become orphaned.
+	orphanTx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := localNode.SubmitTransaction(
+		orphanTx,
+	); err != nil {
+		t.Fatalf(
+			"local submit failed: %v",
+			err,
+		)
+	}
+
+	if _, _, err := localNode.MinePending(); err != nil {
+		t.Fatalf(
+			"local mining failed: %v",
+			err,
+		)
+	}
+
+	// Local transaction is mined,
+	// so the pending pool should be empty.
+	if localNode.PendingCount() != 0 {
+		t.Fatalf(
+			"expected 0 pending transactions before reorg, got %d",
+			localNode.PendingCount(),
+		)
+	}
+
+	// Build a different and longer peer chain.
+	peerTx1 := transaction.New(
+		transaction.Faucet,
+		"Bob",
+		50,
+	)
+
+	if err := peerNode.SubmitTransaction(
+		peerTx1,
+	); err != nil {
+		t.Fatalf(
+			"peer first submit failed: %v",
+			err,
+		)
+	}
+
+	if _, _, err := peerNode.MinePending(); err != nil {
+		t.Fatalf(
+			"peer first mining failed: %v",
+			err,
+		)
+	}
+
+	peerTx2 := transaction.New(
+		transaction.Faucet,
+		"Carol",
+		25,
+	)
+
+	if err := peerNode.SubmitTransaction(
+		peerTx2,
+	); err != nil {
+		t.Fatalf(
+			"peer second submit failed: %v",
+			err,
+		)
+	}
+
+	if _, _, err := peerNode.MinePending(); err != nil {
+		t.Fatalf(
+			"peer second mining failed: %v",
+			err,
+		)
+	}
+
+	if err := localNode.AdoptCandidateChain(
+		peerNode.ChainSnapshot(),
+	); err != nil {
+		t.Fatalf(
+			"adopt candidate failed: %v",
+			err,
+		)
+	}
+
+	// Local node should now use the peer chain.
+	if localNode.HeadHash() != peerNode.HeadHash() {
+		t.Fatal(
+			"expected local node to adopt peer chain",
+		)
+	}
+
+	// Alice's transaction came from the orphaned A1 block.
+	// Because it is still valid, it should return to mempool.
+	if localNode.PendingCount() != 1 {
+		t.Fatalf(
+			"expected 1 restored orphaned transaction, got %d",
+			localNode.PendingCount(),
+		)
+	}
+}
