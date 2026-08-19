@@ -227,6 +227,102 @@ func (n *Node) ChainSnapshot() []block.Block {
 	return blocks
 }
 
+// ValidateCandidateChain checks whether a complete chain
+// received from a peer is valid without changing this node.
+func (n *Node) ValidateCandidateChain(
+	blocks []block.Block,
+) error {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	if len(blocks) == 0 {
+		return errors.New(
+			"candidate chain has no blocks",
+		)
+	}
+
+	if len(n.blockchain.Blocks) == 0 {
+		return errors.New(
+			"local blockchain has no genesis block",
+		)
+	}
+
+	// Both chains must belong to the same blockchain.
+	if blocks[0].Hash != n.blockchain.Blocks[0].Hash {
+		return errors.New(
+			"candidate chain has different genesis block",
+		)
+	}
+
+	// A genesis-only candidate is valid if it matches
+	// our known genesis block.
+	if len(blocks) == 1 {
+		return nil
+	}
+
+	// Network blocks must contain valid signed
+	// network transactions.
+	for _, b := range blocks[1:] {
+		for _, tx := range b.Transactions {
+			if err := tx.ValidateNetwork(); err != nil {
+				return fmt.Errorf(
+					"invalid transaction in candidate block %d: %w",
+					b.Height,
+					err,
+				)
+			}
+		}
+	}
+
+	// Make a deep copy so validation cannot affect
+	// the data supplied by the caller.
+	candidateBlocks := make(
+		[]block.Block,
+		len(blocks),
+	)
+
+	copy(
+		candidateBlocks,
+		blocks,
+	)
+
+	for i := range candidateBlocks {
+		candidateBlocks[i].Transactions = append(
+			[]transaction.Transaction(nil),
+			candidateBlocks[i].Transactions...,
+		)
+	}
+
+	// Use the same blockchain configuration as this node.
+	candidate := &chain.Blockchain{
+		Blocks:                 candidateBlocks,
+		PendingTransactions:    nil,
+		Difficulty:             candidateBlocks[len(candidateBlocks)-1].Difficulty,
+		BlockSize:              n.blockchain.BlockSize,
+		TargetBlockTimeSeconds: n.blockchain.TargetBlockTimeSeconds,
+		RetargetInterval:       n.blockchain.RetargetInterval,
+		MinDifficulty:          n.blockchain.MinDifficulty,
+		MaxDifficulty:          n.blockchain.MaxDifficulty,
+	}
+
+	// Difficulty stores the difficulty expected for
+	// the NEXT block.
+	candidate.Difficulty =
+		candidate.CalculateNextDifficulty()
+
+	validation := candidate.Validate()
+
+	if !validation.Valid {
+		return fmt.Errorf(
+			"invalid candidate chain at block %d: %s",
+			validation.BlockHeight,
+			validation.Reason,
+		)
+	}
+
+	return nil
+}
+
 // Peers returns a copy of the node's current peer list.
 //
 // Returning a copy prevents callers from modifying the internal peer map.

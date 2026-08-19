@@ -534,3 +534,109 @@ func TestChainSnapshot(t *testing.T) {
 		)
 	}
 }
+func TestValidateCandidateChain(
+	t *testing.T,
+) {
+	peerNode := New(
+		"peer-node",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := peerNode.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"submit transaction failed: %v",
+			err,
+		)
+	}
+
+	if _, _, err := peerNode.MinePending(); err != nil {
+		t.Fatalf(
+			"mine block failed: %v",
+			err,
+		)
+	}
+
+	candidate := peerNode.ChainSnapshot()
+
+	localNode := New(
+		"local-node",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	if err := localNode.ValidateCandidateChain(
+		candidate,
+	); err != nil {
+		t.Fatalf(
+			"expected candidate chain to be valid: %v",
+			err,
+		)
+	}
+
+	// Validation must not adopt the chain.
+	if localNode.Height() != 0 {
+		t.Fatalf(
+			"expected local height 0, got %d",
+			localNode.Height(),
+		)
+	}
+}
+func TestValidateCandidateChainRejectsTampering(
+	t *testing.T,
+) {
+	peerNode := New(
+		"peer-node",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := peerNode.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"submit transaction failed: %v",
+			err,
+		)
+	}
+
+	if _, _, err := peerNode.MinePending(); err != nil {
+		t.Fatalf(
+			"mine block failed: %v",
+			err,
+		)
+	}
+
+	candidate := peerNode.ChainSnapshot()
+
+	// Deliberately corrupt the block.
+	candidate[1].Hash = "tampered"
+
+	localNode := New(
+		"local-node",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	if err := localNode.ValidateCandidateChain(
+		candidate,
+	); err == nil {
+		t.Fatal(
+			"expected tampered candidate chain to be rejected",
+		)
+	}
+}
