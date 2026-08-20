@@ -2,6 +2,8 @@ package node
 
 import (
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 
 	"crypto/ed25519"
@@ -879,6 +881,142 @@ func TestAdoptCandidateChainRestoresOrphanedTransactions(
 		t.Fatalf(
 			"expected 1 restored orphaned transaction, got %d",
 			localNode.PendingCount(),
+		)
+	}
+}
+func TestConcurrentNodeAccess(
+	t *testing.T,
+) {
+	n := New(
+		"node-a",
+		[]string{
+			"http://localhost:8002",
+			"http://localhost:8003",
+		},
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	// Put enough transactions in the mempool
+	// so mining can definitely happen.
+	for i := 0; i < chain.DefaultBlockSize; i++ {
+		tx := transaction.New(
+			transaction.Faucet,
+			fmt.Sprintf("Seed-%d", i),
+			10,
+		)
+
+		if err := n.SubmitTransaction(tx); err != nil {
+			t.Fatalf(
+				"seed transaction failed: %v",
+				err,
+			)
+		}
+	}
+
+	var wg sync.WaitGroup
+
+	// All goroutines wait for this channel so they
+	// begin doing work at approximately the same time.
+	start := make(chan struct{})
+
+	errCh := make(
+		chan error,
+		20,
+	)
+
+	// Several goroutines repeatedly read node state.
+	for i := 0; i < 6; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			<-start
+
+			for j := 0; j < 100; j++ {
+				_ = n.Status()
+				_ = n.Height()
+				_ = n.HeadHash()
+				_ = n.PendingCount()
+				_ = n.Peers()
+				_ = n.ChainSnapshot()
+
+				if _, err := n.BlocksFrom(0); err != nil {
+					errCh <- err
+					return
+				}
+			}
+		}()
+	}
+
+	// At the same time, submit new transactions.
+	for i := 0; i < 10; i++ {
+		i := i
+
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			<-start
+
+			tx := transaction.New(
+				transaction.Faucet,
+				fmt.Sprintf(
+					"Concurrent-%d",
+					i,
+				),
+				5,
+			)
+
+			if err := n.SubmitTransaction(tx); err != nil {
+				errCh <- err
+			}
+		}()
+	}
+
+	// Mine while the other goroutines are reading
+	// and submitting transactions.
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		<-start
+
+		if _, _, err := n.MinePending(); err != nil {
+			errCh <- err
+		}
+	}()
+
+	// Release every goroutine.
+	close(start)
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Fatalf(
+			"concurrent node operation failed: %v",
+			err,
+		)
+	}
+
+	if n.Height() != 1 {
+		t.Fatalf(
+			"expected height 1, got %d",
+			n.Height(),
+		)
+	}
+
+	// The original 5 seed transactions were mined.
+	// The 10 concurrently submitted transactions
+	// should remain pending.
+	if n.PendingCount() != 10 {
+		t.Fatalf(
+			"expected 10 pending transactions, got %d",
+			n.PendingCount(),
 		)
 	}
 }
