@@ -1,0 +1,5 @@
+2026/08/20 14:15:43 sync complete peer=http://localhost:8001 local_height=0 head=addee2002b21e9530a9c9070aaa536d7d2600979ea84d6b1d04ee73ea0b3f8fe
+2026/08/20 14:15:43 sync complete peer=http://localhost:8002 local_height=0 head=addee2002b21e9530a9c9070aaa536d7d2600979ea84d6b1d04ee73ea0b3f8fe
+2026/08/20 14:15:43 node starting address=localhost:8003 peers=2
+2026/08/20 14:15:43 node server failed: listen tcp 127.0.0.1:8003: bind: address already in use
+exit status 1
