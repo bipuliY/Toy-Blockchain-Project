@@ -44,6 +44,10 @@ func (s *Server) Handler() http.Handler {
 		"GET /balances",
 		s.handleBalances,
 	)
+	mux.HandleFunc(
+		"GET /peers",
+		s.handlePeers,
+	)
 
 	mux.HandleFunc(
 		"POST /transactions",
@@ -447,6 +451,35 @@ func (s *Server) handleBalances(
 		http.Error(
 			w,
 			"failed to encode balances",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+}
+
+// handlePeers returns the peers currently known
+// by this blockchain node.
+func (s *Server) handlePeers(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	response := struct {
+		Peers []string `json:"peers"`
+	}{
+		Peers: s.node.Peers(),
+	}
+
+	if err := json.NewEncoder(w).Encode(
+		response,
+	); err != nil {
+		http.Error(
+			w,
+			"failed to encode peers",
 			http.StatusInternalServerError,
 		)
 		return

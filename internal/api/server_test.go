@@ -527,3 +527,59 @@ func TestBalancesEndpoint(
 		)
 	}
 }
+func TestPeersEndpoint(
+	t *testing.T,
+) {
+	n := node.New(
+		"localhost:8001",
+		[]string{
+			"http://localhost:8002",
+			"http://localhost:8003",
+		},
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/peers",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+
+	api.NewServer(n).
+		Handler().
+		ServeHTTP(
+			recorder,
+			request,
+		)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusOK,
+			recorder.Code,
+		)
+	}
+
+	var response struct {
+		Peers []string `json:"peers"`
+	}
+
+	if err := json.NewDecoder(
+		recorder.Body,
+	).Decode(&response); err != nil {
+		t.Fatalf(
+			"failed to decode response: %v",
+			err,
+		)
+	}
+
+	if len(response.Peers) != 2 {
+		t.Fatalf(
+			"expected 2 peers, got %d",
+			len(response.Peers),
+		)
+	}
+}
