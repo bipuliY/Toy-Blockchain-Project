@@ -454,3 +454,76 @@ func TestGetBlocksEndpoint(
 		)
 	}
 }
+func TestBalancesEndpoint(
+	t *testing.T,
+) {
+	n := node.New(
+		"localhost:8001",
+		nil,
+		chain.DefaultDifficulty,
+		chain.DefaultBlockSize,
+	)
+
+	tx := transaction.New(
+		transaction.Faucet,
+		"Alice",
+		100,
+	)
+
+	if err := n.SubmitTransaction(tx); err != nil {
+		t.Fatalf(
+			"submit transaction failed: %v",
+			err,
+		)
+	}
+
+	if _, _, err := n.MinePending(); err != nil {
+		t.Fatalf(
+			"mine transaction failed: %v",
+			err,
+		)
+	}
+
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/balances",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+
+	api.NewServer(n).
+		Handler().
+		ServeHTTP(
+			recorder,
+			request,
+		)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusOK,
+			recorder.Code,
+		)
+	}
+
+	var response struct {
+		Balances map[string]int `json:"balances"`
+	}
+
+	if err := json.NewDecoder(
+		recorder.Body,
+	).Decode(&response); err != nil {
+		t.Fatalf(
+			"failed to decode response: %v",
+			err,
+		)
+	}
+
+	if response.Balances["Alice"] != 100 {
+		t.Fatalf(
+			"expected Alice balance 100, got %d",
+			response.Balances["Alice"],
+		)
+	}
+}

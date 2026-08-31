@@ -40,6 +40,10 @@ func (s *Server) Handler() http.Handler {
 		"GET /status",
 		s.handleStatus,
 	)
+	mux.HandleFunc(
+		"GET /balances",
+		s.handleBalances,
+	)
 
 	mux.HandleFunc(
 		"POST /transactions",
@@ -416,7 +420,35 @@ func (s *Server) handleMine(
 // 		MineResult: mineResult,
 // 	}
 
-// 	if err := json.NewEncoder(w).Encode(response); err != nil {
-// 		return
-// 	}
-// }
+//		if err := json.NewEncoder(w).Encode(response); err != nil {
+//			return
+//		}
+//	}
+//
+// handleBalances returns confirmed blockchain balances.
+func (s *Server) handleBalances(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	response := struct {
+		Balances map[string]int `json:"balances"`
+	}{
+		Balances: s.node.Balances(),
+	}
+
+	if err := json.NewEncoder(w).Encode(
+		response,
+	); err != nil {
+		http.Error(
+			w,
+			"failed to encode balances",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+}

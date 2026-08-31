@@ -685,3 +685,23 @@ func (n *Node) AcceptBlock(
 
 	return nil
 }
+
+// Balances returns the confirmed account balances
+// from the current blockchain.
+func (n *Node) Balances() map[string]int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	balances := n.blockchain.Balances()
+
+	result := make(
+		map[string]int,
+		len(balances),
+	)
+
+	for address, balance := range balances {
+		result[address] = balance
+	}
+
+	return result
+}
