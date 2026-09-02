@@ -40,30 +40,7 @@ func main() {
 	)
 	peerClient := network.NewClient()
 
-	// Fetch status from each peer and log the results - contact configured peers
-	// for _, peer := range n.Peers() {
-	// 	status, err := peerClient.FetchStatus(
-	// 		context.Background(),
-	// 		peer,
-	// 	)
-	// 	if err != nil {
-	// 		log.Printf(
-	// 			"could not contact peer=%s error=%v",
-	// 			peer,
-	// 			err,
-	// 		)
-	// 		continue
-	// 	}
-
-	// 	log.Printf(
-	// 		"peer connected peer=%s height=%d head=%s",
-	// 		peer,
-	// 		status.Height,
-	// 		status.HeadHash,
-	// 	)
-	// }
-	// Contact configured peers and catch up with any peer
-	// that has a longer blockchain.
+	
 	for _, peer := range n.Peers() {
 		if err := syncer.SyncFromPeer(
 			context.Background(),

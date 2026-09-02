@@ -54,7 +54,6 @@ func (s *Server) Handler() http.Handler {
 		s.handleTransaction,
 	)
 
-	// IMPORTANT: this route was missing
 	mux.HandleFunc(
 		"POST /blocks",
 		s.handleBlock,
@@ -256,14 +255,7 @@ func (s *Server) handleTransaction(
 		return
 	}
 
-	// if err := s.node.SubmitTransaction(tx); err != nil {
-	// 	http.Error(
-	// 		w,
-	// 		err.Error(),
-	// 		http.StatusBadRequest,
-	// 	)
-	// 	return
-	// }
+	
 
 	if err := s.node.SubmitTransaction(tx); err != nil {
 		if errors.Is(

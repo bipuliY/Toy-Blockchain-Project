@@ -19,15 +19,8 @@ var ErrBlockAlreadySeen = errors.New(
 )
 
 // Node represents one running blockchain node.
-//
-// Later this type will also coordinate:
-//   - HTTP requests
-//   - transaction gossip
-//   - block gossip
-//   - chain synchronisation
-//   - fork resolution
-//
-// For now it only owns the blockchain and basic network configuration.
+// It owns the blockchain state, peers, and deduplication data.
+
 type Node struct {
 	mu sync.RWMutex //protect shared state
 
@@ -78,27 +71,7 @@ func New(
 	}
 }
 
-// MinePending mines pending transactions into a new block.
-// func (n *Node) MinePending() (
-// 	block.Block,
-// 	block.MineResult,
-// 	error,
-// ) {
-// 	n.mu.Lock()
-// 	defer n.mu.Unlock()
 
-// 	// return n.blockchain.MinePending()
-// 	minedBlock, result, err :=
-// 	n.blockchain.MinePending()
-
-// if err != nil {
-// 	return block.Block{}, block.MineResult{}, err
-// }
-
-// n.seenBlocks[minedBlock.Hash] = struct{}{}
-
-// return minedBlock, result, nil
-// }
 func (n *Node) MinePending() (
 	block.Block,
 	block.MineResult,
@@ -322,11 +295,12 @@ func (n *Node) ValidateCandidateChain(
 
 	return nil
 }
-
 // AdoptCandidateChain replaces the local blockchain
 // with a valid longer candidate chain.
 //
-// Orphaned block transactions are restored separately.
+// Valid transactions from orphaned blocks and the old
+// pending pool are restored when possible.
+
 func (n *Node) AdoptCandidateChain(
 	blocks []block.Block,
 ) error {
@@ -523,20 +497,7 @@ func (n *Node) Status() Status {
 	}
 }
 
-// SubmitTransaction validates a network transaction and,
-// if valid, adds it to this node's pending transaction pool.
-// func (n *Node) SubmitTransaction(
-// 	tx transaction.Transaction,
-// ) error {
-// 	if err := tx.ValidateNetwork(); err != nil {
-// 		return err
-// 	}
 
-// 	n.mu.Lock()
-// 	defer n.mu.Unlock()
-
-//		return n.blockchain.AddTransaction(tx)
-//	}
 func (n *Node) SubmitTransaction(
 	tx transaction.Transaction,
 ) error {
